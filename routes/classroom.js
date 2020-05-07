@@ -869,6 +869,47 @@ router.post("/vote",authenticated,(req,res)=>{
 
 router.post("/expired",authenticated,(req,res) => {
 
+  edits = async (ids) =>{
+    for(let i=0;i<ids.length;i++) {
+      let expiredElec = await Election.findById(ids[i]).exec();
+      if (expiredElec) {
+        const start = new Date(expiredElec.date).getTime();
+        const duration = expiredElec.duration * 3600000;
+        const expiration = start + duration;
+        const current = new Date().getTime();
+        const expired = current < expiration ? false : true;
+        if (expired && expiredElec.status) {
+          expiredElec.status = false;
+          let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'ongoingElections archived',options:{sort:{'date':1}}}).exec();
+          const idx = expiredElecClass.ongoingElections.findIndex(e => e._id == ids[i]);
+          if (idx > -1) {
+            expiredElec.electionAccess = [];
+            expiredElec.voteStatus = [];
+            let savedExpiredElec = await expiredElec.save();
+            let filteredPoll = await Election.findById(ids[i]).exec();
+            expiredElecClass.ongoingElections.splice(idx,1);
+            if (expiredElecClass.archived.length < 100) {
+              expiredElecClass.archived.push(filteredPoll);
+            } else {
+              expiredElecClass.archived.splice(0,1,filteredPoll);
+            }
+
+            let savedExpiredElecClass = await expiredElecClass.save();
+          } else {
+            throw new Error();
+          }
+        } else {
+          throw new Error();
+        }
+      } else {
+        throw new Error();
+      }
+    }
+  }
+
+
+  /*
+
   editing = (id) => {
     return new Promise((resolve,reject)=>{
       Election.findById(id).exec((err,poll)=>{
@@ -885,9 +926,8 @@ router.post("/expired",authenticated,(req,res) => {
               if (err) throw err
               const idx = classroom.ongoingElections.findIndex(e => e._id == id);
               if (idx > -1) {
-                let filteredPoll = poll;
-                delete filteredPoll.electionPermission;
-                delete filteredPoll.voteStatus;
+                poll.electionPermission = [];
+                poll.voteStatus = [];
                 classroom.ongoingElections.splice(idx,1);
                 if (classroom.archived.length < 100) {
                   classroom.archived.push(filteredPoll);
@@ -939,8 +979,9 @@ router.post("/expired",authenticated,(req,res) => {
   }
 
   let polls = req.body.ids;
-  updated(polls).catch(()=>{
-    res.status(422).json({});
+  */
+  edits(req.body.ids).catch(()=>{
+    return res.status(422).json({});
   });
 
 

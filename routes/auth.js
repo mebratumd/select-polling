@@ -39,13 +39,15 @@ router.get("/loggedin",authenticated,(req,res)=>{
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
-    select: '-password -delete -_id -__v',
+    select: '-password',
     populate: {
       path: 'ongoingElections archived',
       select: '-tokens',
       options:{sort:{'date':-1}}
     }
-  }).select('-password').lean().exec((err,student)=>{
+  }).select('-password -_id').lean().exec((err,student)=>{
+
+
 
     if (student) {
 

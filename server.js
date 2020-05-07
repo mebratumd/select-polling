@@ -12,7 +12,6 @@ const rateLimit = require("express-rate-limit");
 const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
-const cors = require('cors');
 
 
 
@@ -28,7 +27,7 @@ const classLimiter = rateLimit({
 
 require('./config/passport.js')(passport);
 
-mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
+mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://mat:students@select-ddero.mongodb.net/test?retryWrites=true&w=majority", {useNewUrlParser: true})
 .then(()=>{
   console.log("Connected");
 }).catch((error)=>{
@@ -39,7 +38,6 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 const PORT = process.env.PORT || 5000;
 
 
-app.use(cors());
 app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
   secret: 'keyboard cat',
@@ -71,12 +69,8 @@ io.of("/update").on("connection",(socket)=>{
   socket.on("check",(classID)=>{
     Classroom.findById(classID).populate({
       path: 'ongoingElections',
-      populate: {
-        path: 'candidates'
-      }
     }).exec((err,classroom)=>{
       if (err) throw err
-
       if (classroom) {
         io.of("/update").in(socket.rooms[classroom.name]).emit("updatedCount",{updatedElections:classroom.ongoingElections,name:classroom.name});
       }
@@ -90,7 +84,7 @@ io.of("/update").on("connection",(socket)=>{
       if (error) throw error
       if (classroom) {
         socket.join(classroom.name, ()=>{
-          console.log(Object.keys(socket.rooms));
+          //console.log(Object.keys(socket.rooms));
         });
       }
     });
