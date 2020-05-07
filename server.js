@@ -12,6 +12,7 @@ const rateLimit = require("express-rate-limit");
 const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
+const cors = require('cors');
 
 
 
@@ -38,6 +39,7 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://mat:students@select-d
 const PORT = process.env.PORT || 5000;
 
 
+app.use(cors());
 app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
   secret: 'keyboard cat',
