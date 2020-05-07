@@ -28,7 +28,7 @@ const classLimiter = rateLimit({
 
 require('./config/passport.js')(passport);
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://mat:students@select-ddero.mongodb.net/test?retryWrites=true&w=majority", {useNewUrlParser: true})
+mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 .then(()=>{
   console.log("Connected");
 }).catch((error)=>{
