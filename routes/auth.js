@@ -278,7 +278,7 @@ router.get("/a/:username/:hash",(req,res,next)=>{
 
   Student.find({username:req.params.username.toLowerCase()}).exec((err,user)=>{
     if (err) next(err)
-    if (user) {
+    if (user.length > 0) {
       if (user.hash == req.params.hash) {
         user.active = true;
         user.save().then(()=>{
