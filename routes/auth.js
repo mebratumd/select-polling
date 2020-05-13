@@ -286,7 +286,7 @@ router.get("/a/:username/:hash",(req,res,next)=>{
         }).catch((err) => res.send(`<p>There was an error. Please re-submit the link.</p>`));
       }
     } else {
-      return res.status(422).json({errors:[{msg:'This user does not exist.'}]});
+      return res.send(`<p>User not found.</p>`)
     }
   });
 
