@@ -279,9 +279,9 @@ router.get("/a/:username/:hash",(req,res,next)=>{
   Student.find({username:req.params.username.toLowerCase()}).exec((err,user)=>{
     if (err) next(err)
     if (user.length > 0) {
-      if (user.hash == req.params.hash) {
-        user.active = true;
-        user.save().then(()=>{
+      if (user[0].hash == req.params.hash) {
+        user[0].active = true;
+        user[0].save().then(()=>{
           return res.send(`<p>Thank you for activating your account, ${user.firstname}. <a href="https://select-poll.herokuapp.com/login">Login</a></p>`)
         }).catch((err) => res.send(`<p>There was an error. Please re-submit the link.</p>`));
       }
