@@ -12,7 +12,9 @@ const studentSchema = new mongoose.Schema({
   status: Boolean,
   active: Boolean,
   registered: Date,
-  delete: {type:Date}, 
+  delete: {type:Date},
+  hash: String,
+  key:String,
   classrooms_master: [{type: mongoose.Schema.Types.ObjectId, ref: 'Classroom'}],
   classrooms_student: [{type: mongoose.Schema.Types.ObjectId, ref: 'Classroom'}]
 });

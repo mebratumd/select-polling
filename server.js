@@ -27,7 +27,7 @@ const classLimiter = rateLimit({
 
 require('./config/passport.js')(passport);
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://mat:students@select-ddero.mongodb.net/test?retryWrites=true&w=majority", {useNewUrlParser: true})
+mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 .then(()=>{
   console.log("Connected");
 }).catch((error)=>{
@@ -35,33 +35,38 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://mat:students@select-d
 })
 
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 
 app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
   secret: 'keyboard cat',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   store: new MongoStore({
     url: "mongodb+srv://mat:students@select-ddero.mongodb.net/test?retryWrites=true&w=majority",
     collection: "sessions",
-    ttl:86400,
+    ttl:3600,
     autoRemove: 'interval',
     autoRemoveInterval:5
   })
 }));
-
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
-app.set('trust proxy', true);
+app.set('trust proxy', true); //
+
 app.use("/", auth);
 app.use("/class",classroom);
 
-app.use("/",classLimiter);
+// DB failures
+app.use((error,req,res,next)=>{
+  res.status(500).json({errors:[{msg:'Something went wrong.'}]});
+});
+
+app.use("/",classLimiter); //
 
 // update polls
 io.of("/update").on("connection",(socket)=>{

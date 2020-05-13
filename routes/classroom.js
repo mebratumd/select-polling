@@ -3,7 +3,21 @@ const { check, validationResult } = require('express-validator');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const upload = multer({ dest: './uploads' });
+const upload = multer({
+  dest: './uploads',
+  fileFilter: (req,file,cb)=>{
+    if (path.extname(file.originalname) != ".csv") {
+      req.incorrectType = true;
+      return cb(null,false);
+    }
+
+    cb(null,true);
+  },
+  limits:{
+    files:1,
+    fileSize:100000
+  }
+});
 const csv = require('fast-csv');
 const fs = require('fs');
 const Classroom = require('../models/classroom.js');
@@ -22,13 +36,35 @@ const authenticated = (req,res,next) => {
 
 }
 
+const errorFile = (err,req,res,next) => {
+  console.log(err);
+  if (err.code == 'LIMIT_FILE_SIZE') {
+    return res.status(422).json({errors:[{msg:"File exceeds 100 MB."}]});
+  } else if (err.code == 'LIMIT_FILE_COUNT') {
+    return res.status(422).json({errors:[{msg:"Multiple files submitted. Only submit 1 CSV file with a class list."}]});
+  } else {
+    next()
+  }
+}
+
+
+
 // dashboard endpoints
 
-router.post("/search",authenticated,(req,res)=>{
+router.post("/search",authenticated,[check('name').matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val){
+    return val.toLowerCase();
+  }
+})],(req,res,next)=>{
 
-  Classroom.find({ name: {$regex: req.body.name.replace(/ /g,''), $options: 'i' } }).select('name school').limit(100).exec((err,rooms)=>{
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
-    if (err) throw err
+  Classroom.find({ name: {$regex: req.body.name } }).select('name school').limit(100).exec((err,rooms)=>{
+
+    if (err) next(err)
 
     return res.json({classes:rooms});
 
@@ -36,13 +72,24 @@ router.post("/search",authenticated,(req,res)=>{
 
 });
 
-router.post("/password",authenticated,(req,res)=>{
+
+router.post("/password",authenticated,[check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val=>{
+  if (val){
+    return val.toLowerCase();
+  }
+})],(req,res,next)=>{
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   Classroom.findOne({name:req.body.name}).exec((err,room)=>{
-    if (err) throw err
+    if (err) next(err)
     if (room) {
       bcrypt.compare(req.body.password,room.password,(err,resp)=>{
-        if (err) throw err
+        if (err) next(err)
         if (resp){
           const student = room.students.filter((student)=>{
             return student.email == req.user.email && student.studentnumber == req.user.studentnumber;
@@ -50,17 +97,17 @@ router.post("/password",authenticated,(req,res)=>{
           if (student.length > 0) {
             // success
             Student.findById(req.user.id).exec((e,s)=>{
-              if (e) throw e
+              if (e) next(e)
               if (s) {
+
                 if (s.classrooms_student.length < 5) {
                   s.classrooms_student.push(room.id);
                   room.joined = room.joined + 1;
                   room.save();
-                  s.save((e,s)=>{
-                    if (e) throw e
-                    if (s) res.json({})
-                    else res.status(422).json({errors:[{msg:`Something went wrong. Please submit details again.`}]});
-                  });
+                  s.save().then(() => {
+                    return res.json({})
+                  }).catch((err) => next(err));
+
                 } else {
                   return res.status(422).json({errors:[{msg:`You have reached the limit for the amount of classrooms you can be a student in.`}]});
                 }
@@ -91,7 +138,13 @@ router.post("/password",authenticated,(req,res)=>{
 
 // creating classroom endpoints
 
-router.post("/edit",authenticated,upload.single('classfile'), (req,res)=>{
+router.post("/edit",authenticated,upload.single('classfile'),errorFile,(req,res)=>{
+
+
+  if (req.incorrectType) {
+    return res.status(422).json({errors:[{msg:"File must be in CSV format."}]});
+  }
+
   const headers = ["name","studentnumber","email"];
   const students = [];
 
@@ -106,7 +159,7 @@ router.post("/edit",authenticated,upload.single('classfile'), (req,res)=>{
       });
       sortedObject = {};
       Object.keys(row).sort().forEach((key)=>{
-        sortedObject[key.toLowerCase()] = row[key];
+        sortedObject[key.toLowerCase()] = row[key].trim().replace(/\s\s+/g, ' ');
       })
       students.push(sortedObject);
     }).on('error',(error)=> {
@@ -126,38 +179,54 @@ router.post("/edit",authenticated,upload.single('classfile'), (req,res)=>{
   }
 
   fs.unlink(`./uploads/${req.file.filename}`, (err) => {
-    if (err) throw err
+    if (err) console.log(err)
   });
 
 
 });
 
-router.post("/submit",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric."),
+router.post("/submit",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val) {
+    return val.toLowerCase();
+  }
+}),
 check('school').isIn(['University of Manitoba']).withMessage("School not found."),
 check('partake').isIn([true,false]).withMessage("Partake status must be either 'yes' or 'no'"),
-check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-], (req,res)=>{
+check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")], (req,res,next)=>{
 
-  const schoolExtensions = {'University of Manitoba': ['myumanitoba.ca','cc.umanitoba.ca','umanitoba.ca']};
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+
+  let schoolExtensions = {'University of Manitoba': ['myumanitoba.ca','cc.umanitoba.ca','umanitoba.ca']};
 
   let finalClassList = [];
+
   const studentCheck = (student) => {
-    const headers = Object.keys(student);
+    const headers = Object.keys(student).map(val => val.trim().replace(/\s+/g,'').toLowerCase());
+    const studentVals = Object.values(student).map(val => val.trim().replace(/\s\s+/g,' '));
     const sorted = {};
+    const clean = {};
 
     if (headers.length == 3) {
       headers.forEach((header)=>{
-          if (['name','studentnumber','email'].indexOf(header.toLowerCase()) == -1) {
+          if (['name','studentnumber','email'].indexOf(header) == -1) {
             throw new Error("Incorrect CSV headers. Please ensure that the CSV file you uploaded has the following headers as the first row: name,studentnumber,email ");
           }
       });
-      headers.sort().forEach((header)=>{
-        sorted[header.toLowerCase()] = student[header];
-      });
+
+      for(let i=0;i<headers.length;i++) {
+        clean[headers[i]] = studentVals[i];
+      }
+       // here
+       Object.keys(clean).sort().forEach((header)=>{
+         sorted[header] = clean[header];
+       });
+
     } else {
       throw new Error("Incorrectly formatted information. Check class list.");
     }
-
 
     if (Object.values(student).length == 3) {
       Object.values(sorted).forEach((field,i)=>{
@@ -228,20 +297,18 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
   }
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(422).json({ errors: errors.array() });
-  }
+
 // here
 
   Student.findById(req.user.id).exec((er,st)=>{
-    if (er) throw er
+    if (er) next(er)
     // less than or equal to 10 classrooms
     if (st.classrooms_master.length < 5) {
 
 
-      Classroom.find({name:req.body.classname.toLowerCase()},(err,classroom) => {
-        if (err) throw err
+      Classroom.find({ name:req.body.classname },(err,classroom) => {
+        if (err) next(err)
+
 
         if (classroom.length == 0) {
           try {
@@ -294,7 +361,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
             bcrypt.genSalt(10, (err, salt) => {
               bcrypt.hash(req.body.password, salt, (err, hash) => {
-                if (err) throw err
+                if (err) next(err)
                   // Store hash in your password DB.
                   const addClassroom = new Classroom({
                     name: req.body.classname.toLowerCase(),
@@ -308,20 +375,12 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
                   });
 
                   addClassroom.save((err,classroom)=>{
-                    if (err) throw err
+                    if (err) next(err)
                     if (classroom) {
-                      Student.findById(req.user.id, (err,student)=>{
-                        if (err) throw err
-                        if (student) {
-                          student.classrooms_master.push(classroom.id);
-                          student.save((err,updated)=>{
-                            if (err) throw err
-                            return res.json({}); // success
-                          });
-                        } else {
-                          throw new Error('Classroom was successfully created, however, you will need to search for the class and enter its password. This can be done from your dashboard.');
-                        }
-                      });
+                      st.classrooms_master.push(classroom.id);
+                      st.save().then(()=>{
+                        return res.json({}); // success
+                      }).catch(err => next(err));
                     } else {
                       throw new Error("Oops. Something went wrong. Try re-submitting.")
                     }
@@ -347,7 +406,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
 
     } else {
-      return res.status(422).json({errors:[{msg:"A maximum of 14 classes can be adminned per user."}]});
+      return res.status(422).json({errors:[{msg:"A maximum of 5 classes can be administrated per user."}]});
     }
   })
 
@@ -358,9 +417,13 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
 // classroom endopoints
 
-router.post("/delete-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric."),
+router.post("/delete-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val){
+    return val.toLowerCase();
+  }
+}),
 check('studentnumber').isLength({min:5,max:10}).withMessage('Student number must be between 5-10 digits in length.').isInt().withMessage('Student number must be an integer.'),
-check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
+check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -368,8 +431,8 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
   }
 
 
-  Classroom.findOne({name:req.body.classname.toLowerCase()}).exec((err,room)=>{
-    if (err) throw err
+  Classroom.findOne({ name:req.body.classname }).exec((err,room)=>{
+    if (err) next(err)
 
     try {
       if (room) {
@@ -386,24 +449,22 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
 
             // this should execute regardless of student status
             Student.findOne({studentnumber:req.body.studentnumber,email:req.body.email}).exec((err,student)=>{
-              if (err) throw err
+              if (err) next(err)
               if (student) {
                 const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
                 student.classrooms_student = newClassList;
-                student.save((err,student)=>{
-                  if (err) throw err
-                });
+                student.save().then(()=>{
+
+                }).catch((err)=>next(err));
               }
 
             });
 
-            const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber);
+            const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
             room.students = newClassList;
-            room.save((err,room)=>{
-              if (err) throw err
-            });
-
-            return res.json({removedStudent:req.body});
+            room.save().then(()=>{
+              return res.json({removedStudent:req.body});
+            }).catch((err)=>next(err));
 
           } else {
             throw new Error("You cannot remove students from the classroom.");
@@ -427,22 +488,30 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
 
 });
 
-router.post("/add-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric."),
-check('name').isLength({min:5,max:33}).withMessage('Name must be between 2-40 characters (including spaces).').matches(/^[\w ]+$/).withMessage('Name must be alphanumeric.'),
+router.post("/add-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val){
+    return val.toLowerCase();
+  }
+}),
+check('name').isLength({min:5,max:33}).withMessage('Name must be between 2-40 characters (including spaces).').matches(/^[\w ]+$/).withMessage('Name must be alphanumeric.').customSanitizer(val => {
+  if (val) {
+    return val.trim().replace(/\s\s+/g,' ')
+  }
+}),
 check('studentnumber').isLength({min:5,max:10}).withMessage('Student number must be between 5-10 digits in length.').isInt().withMessage('Student number must be an integer.'),
-check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
+check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.findOne({name:req.body.classname.toLowerCase()}).exec((err,room)=>{
-    if (err) throw err
+  Classroom.findOne({ name:req.body.classname }).exec((err,room)=>{
+    if (err) next(err)
 
     try {
       if (room) {
-        if (room.students.length <= 120) {
+        if (room.students.length < 500) {
           if (room.master == req.user.id) {
 
             if (req.user.email == req.body.email) {
@@ -456,7 +525,7 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
             //looking for duplicate email and student number
             room.students.forEach((student)=>{
 
-              if (student.email == req.body.email.toLowerCase()) {
+              if (student.email == req.body.email) {
                 throw new Error('Duplicate email found.');
               }
 
@@ -496,25 +565,20 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
 
             //
 
-            Student.find({email:req.body.email.toLowerCase(),studentnumber:req.body.studentnumber}).exec((err,student)=>{
-              if (err) throw err
+            Student.find({email:req.body.email,studentnumber:req.body.studentnumber}).exec((err,student)=>{
+              if (err) next(err)
               let addedStudent;
               if (student.length > 0) {
-                addedStudent = {email:student.email,studentnumber:student.studentnumber,name:`${student.firstname} ${student.lastname}`,disabled:false};
+                addedStudent = {email:student.email,studentnumber:student.studentnumber,name:req.body.name};
                 room.students.push(addedStudent);
               } else {
-                addedStudent = {email:req.body.email.toLowerCase(),studentnumber:req.body.studentnumber,name:req.body.name,disabled:true};
+                addedStudent = {email:req.body.email,studentnumber:req.body.studentnumber,name:req.body.name};
                 room.students.push(addedStudent);
               }
 
-              room.save((err,room)=>{
-                if (err) throw err
-                if (room) {
-                  return res.json({addedStudent:addedStudent});
-                } else {
-                  throw new Error('Oops. Something went wrong. Please try adding details again.');
-                }
-              })
+              room.save().then(()=>{
+                return res.json({addedStudent:addedStudent});
+              }).catch((err)=>next(err));
 
             });
 
@@ -522,7 +586,7 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
             throw new Error('You do not have permission to modify the class list.');
           }
         } else {
-          throw new Error('Classroom cannot exceed 120 students');
+          throw new Error('Classroom cannot exceed 500 students');
         }
 
 
@@ -543,13 +607,24 @@ check('email').isEmail().withMessage('Invalid email.')], (req,res)=>{
 
 });
 
-router.post("/status",authenticated,(req,res)=>{
+router.post("/status",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val){
+    return val.toLowerCase();
+  }
+})],(req,res,next)=>{
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   Student.findById(req.user.id, (err,student) => {
+    if (err) next(err)
 
     if (student) {
 
       Classroom.findOne({name:req.body.name},(err,room)=>{
+        if (err) next(err)
 
         if (room) {
           if (req.user.id == room.master) {
@@ -558,7 +633,7 @@ router.post("/status",authenticated,(req,res)=>{
             if (student.classrooms_student.indexOf(room.id) > -1) {
               return res.json({master:false});
             } else {
-              return res.status(422).send(); // not a student or a master/admin
+              return res.status(422).send();
             }
           }
         } else {
@@ -566,17 +641,28 @@ router.post("/status",authenticated,(req,res)=>{
         }
 
       });
+    } else {
+      next(err)
     }
+
   });
 
 });
 
-router.post("/ticket",authenticated,[check('title').isLength({min:10,max:150}).withMessage("Election title must be between 10-150 characters."),
-check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.'),
+router.post("/ticket",authenticated,[check('title').isLength({min:10,max:150}).withMessage("Election title must be between 10-150 characters.").customSanitizer(val => {
+  if (val) {
+    return val.trim().replace(/\s\s+/g, ' ')
+  }
+}),
+check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.'),
 check('restrictions').custom((resOb) => Object.prototype.toString.call(resOb) == "[object Object]").withMessage('Incorrect format detected.'),
-check('candidates').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
-check('description').isLength({min:20,max:500}).withMessage("Description must be between 20-500 characters."),
-check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res)=>{
+check('candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
+check('description').isLength({min:20,max:500}).withMessage("Description must be between 20-500 characters.").customSanitizer(val => {
+  if (val) {
+    return val.trim().replace(/\s\s+/g, ' ')
+  }
+}),
+check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
 
 
   const errors = validationResult(req);
@@ -609,14 +695,26 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
 
 });
 
-router.post("/submit-ticket",authenticated,[check('sheet.*.title').isLength({min:10,max:150}).withMessage("All election titles must be between 10-150 characters."),
+router.post("/submit-ticket",authenticated,[check('sheet.*.title').isLength({min:10,max:150}).withMessage("All election titles must be between 10-150 characters.").customSanitizer(val => {
+  if (val) {
+    return val.trim().replace(/\s\s+/g, ' ')
+  }
+}),
 check('sheet').custom((electionSheet) => electionSheet.length < 20 && electionSheet.length > 0).withMessage('The ticket must be less than 20 elections.'),
-check('sheet.*.links.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.'),
+check('sheet.*.links.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.'),
 check('sheet.*.restrictions').custom((restrictedOb) => Object.prototype.toString.call(restrictedOb) == "[object Object]").withMessage('Incorrect format.'),
-check('sheet.*.candidates').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
-check('sheet.*.description').isLength({min:20,max:500}).withMessage("All descriptions must be between 20-500 characters."),
+check('sheet.*.candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
+check('sheet.*.description').isLength({min:20,max:500}).withMessage("All descriptions must be between 20-500 characters.").customSanitizer(val => {
+  if (val) {
+    return val.trim().replace(/\s\s+/g, ' ')
+  }
+}),
 check('sheet.*.duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
-check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.")],(req,res)=>{
+check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val) {
+    return val.toLowerCase()
+  }
+})],(req,res,next)=>{
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -627,8 +725,8 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
     let allCandidates = [];
     let trueCandidates;
 
-    Classroom.findOne({name:req.body.classname}).exec((error,classroom)=>{
-      if (error) throw error
+    Classroom.findOne({ name:req.body.classname }).exec((error,classroom)=>{
+      if (error) next(error)
       if (classroom) {
         if (classroom.master == req.user.id) {
 
@@ -640,12 +738,19 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
 
             const restrictedStudentIds = Object.keys(poll.restrictions);
             let restrictedCandidates = [];
+            const re = new RegExp('^[\\d]{5,10}$');
             restrictedStudentIds.forEach((id)=>{
-              if (poll.restrictions[id]) {
+              if (!re.test(id)) {
+                return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
+              }
+              if (poll.restrictions[id] == true) {
                 restrictedCandidates.push(id);
+              } else if (poll.restrictions[id] == false) {
+                // ignore
+              } else {
+                return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
               }
             });
-
 
             let voterStat = classroom.students.map((student)=>{
               if (restrictedCandidates.indexOf(student.studentnumber.toString()) == -1) {
@@ -653,7 +758,7 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
               } else {
                 return {studentnumber:student.studentnumber,didVote:true};
               }
-            });
+            }); //
 
             const classStudentIds = classroom.students.map(student => student.studentnumber);
             trueCandidates = Object.keys(poll.candidates).filter(candidate => poll.candidates[candidate] == true);
@@ -683,19 +788,12 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
 
           Election.insertMany(sheet).then((docs) => {
             classroom.ongoingElections = docs;
-            classroom.save((e,r)=>{
-              if (e) throw e
-              if (r) {
-                return res.json({});
-              } else {
-                return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
-              }
-            });
-
+            classroom.save().then(()=>{
+              return res.json({});
+            }).catch(err=>next(err));
           },(err)=>{
             return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
           });
-
 
         } else {
           return res.status(422).json({errors:[{msg:'You do not have permission to create polls for this class.'}]})
@@ -710,73 +808,111 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
 
 });
 
-router.post("/access-poll",authenticated,(req,res)=>{
+router.post("/access-poll/:key",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val) {
+    return val.toLowerCase();
+  }
+}),
+check('password').isLength({min:4}).withMessage("Password must be at least 4 characters.").matches(/^[\w-]+$/).withMessage("Password must be alphanumeric. Hyphens are allowed.")],(req,res,next)=>{
 
-  Classroom.findOne({ name:req.body.name }).populate('ongoingElections').exec((err,classroom) => {
-      if (err) throw err
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
-      try {
-        if (classroom) {
-          const studentIds = classroom.students.map(student => student.studentnumber);
-          if (studentIds.includes(req.user.studentnumber)) {
+  if (req.params.key === "code") {
+    Classroom.findOne({ name:req.body.name }).populate('ongoingElections').exec((err,classroom) => {
+        if (err) next(err)
 
-            if (classroom.ongoingElections.length > 0) {
+        try {
+          if (classroom) {
+            const studentIds = classroom.students.map(student => student.studentnumber);
+            if (studentIds.includes(req.user.studentnumber)) {
 
-              const firstElection = classroom.ongoingElections[0]; // grab first election
-              const pass = firstElection.tokens.find((student) => {
-                return student.studentnumber == req.user.studentnumber && student.hash == req.body.password;
-              });
+              if (classroom.ongoingElections.length > 0) {
 
-              if (!pass) {
-                throw new Error('Incorrect password.');
-              } else {
-                Election.find({tokens: {$elemMatch : { studentnumber:req.user.studentnumber,hash:req.body.password }}}).exec((err,polls) => {
-                  if (err) throw err
-                  if (polls) {
-                    polls.forEach((poll,idx)=>{
-                      poll.electionAccess.forEach((person,i)=>{
-                        if (person.studentnumber == req.user.studentnumber) {
-                          poll.electionAccess.splice(i,1,{_id: person._id,studentnumber:req.user.studentnumber,permission:true});
-                          poll.save((err,complete)=>{
+                const firstElection = classroom.ongoingElections[0];
+                const pass = firstElection.tokens.find((student) => {
+                  return student.studentnumber == req.user.studentnumber && student.hash == req.body.password;
+                });
+
+                if (!pass) {
+                  throw new Error('Incorrect password.');
+                } else {
+                  Election.find({tokens: {$elemMatch : { studentnumber:req.user.studentnumber,hash:req.body.password }}}).exec((err,polls) => {
+                    if (err) next(err)
+                    if (polls) {
+                      polls.forEach((poll,idx)=>{
+                        poll.electionAccess.forEach(async function(person,i) {
+                          if (person.studentnumber == req.user.studentnumber) {
+                            poll.electionAccess.splice(i,1,{_id: person._id,studentnumber:req.user.studentnumber,permission:true});
+                            await poll.save().then(()=>{}).catch(err => next(err));
                             if (polls.length == idx+1) {
                               return res.json({});
                             }
-                          })
-                        }
+                          }
+                        });
                       });
-                    });
-                  } else {
-                    throw new Error('Oops. Something went wrong. Please try submitting details again.');
-                  }
-
-
-                });
+                    } else {
+                      throw new Error('Oops. Something went wrong. Please try submitting details again.');
+                    }
+                  });
+                }
+              } else {
+                //
+                throw new Error('No elections currently going on.');
               }
+
             } else {
-              //
-              throw new Error('No elections currently going on.');
+              // student is not apart of the classroom
+              throw new Error("You cannot partake in this classroom's elections.");
+
             }
 
           } else {
-            // student is not apart of the classroom
-            throw new Error("You cannot partake in this classroom's elections.");
+            // classroom doesn't exist
+            throw new Error("This classroom does not exist.");
+          }
+        } catch(e) {
+          return res.status(422).json({errors:[{msg:e.message}]});
+        }
 
+
+      });
+  }
+
+  if (req.params.key == "key") {
+    bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
+      if (error) next(error)
+      if (response) {
+        Classroom.find({name:req.body.name}).populate('ongoingElections').exec((err,room)=>{
+          if (err) next(err)
+          if (room.length > 0) {
+            let valid = room[0].students.filter(student => student.studentnumber == req.user.studentnumber);
+            if (valid.length > 0) {
+              let firstElection = room[0].ongoingElections[0];
+              console.log(firstElection);
+              let token = firstElection.tokens.filter(token => token.studentnumber == req.user.studentnumber)[0];
+              return res.json({key:token.hash});
+            } else {
+              return res.status(422).json({errors:[{msg:'You are not apart of the class list.'}]});
+            }
+          } else {
+            return res.status(422).json({errors:[{msg:'Classroom not found.'}]});
           }
 
-        } else {
-          // classroom doesn't exist
-          throw new Error("This classroom does not exist.");
-        }
-      } catch(e) {
-        return res.status(422).json({errors:[{msg:e.message}]});
+        });
+      } else {
+        return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
       }
-
-
     });
+  }
+
+
 
 });
 
-router.post("/vote",authenticated,(req,res)=>{
+router.post("/vote",authenticated,(req,res,next)=>{
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
@@ -784,7 +920,7 @@ router.post("/vote",authenticated,(req,res)=>{
       path: 'ongoingElections',
     }
   }).exec((err,student)=>{
-
+    if (err) next(err)
     try {
       const foundElectionMaster = student.classrooms_master.filter((room)=>{
         return room.ongoingElections.some(e => e._id == req.body.id );
@@ -796,6 +932,7 @@ router.post("/vote",authenticated,(req,res)=>{
 
       if (foundElectionMaster.length > 0 || foundElectionStudent.length > 0) {
         Election.findById(req.body.id).exec((err,elec) => {
+          if (err) next(err)
           const start = new Date(elec.date).getTime();
           const duration = elec.duration*3600000;
           const expiration = start + duration;
@@ -803,13 +940,19 @@ router.post("/vote",authenticated,(req,res)=>{
           const expired = current < expiration ? false : true;
           if (expired && elec.status) {
             elec.status = false;
-            elec.save();
-            Classroom.findById(elec.class).populate('ongoingElections').exec((err,room)=>{
-              const idx = room.ongoingElections.findIndex(e => e._id == req.body.id);
-              room.ongoingElections.splice(idx,1);
-              room.archived.push(elec);
-              room.save();
-            });
+            elec.voteStatus = [];
+            elec.electionAccess = []
+            elec.save().then((updateElec) => {
+              Classroom.findById(updatedElec.class).populate('ongoingElections').exec((err,room)=>{
+                if (err) next(err)
+                const idx = room.ongoingElections.findIndex(e => e._id == req.body.id);
+                room.ongoingElections.splice(idx,1);
+                room.archived.push(updatedElec);
+                room.save().catch((err) => next(err));
+              });
+
+
+            }).catch((err) => next(err));
 
             throw new Error('Cannot submit vote as the poll is now closed.');
           } else {
@@ -832,9 +975,10 @@ router.post("/vote",authenticated,(req,res)=>{
                     ob.didVote = true;
                   }
                 });
-                elec.save();
+                elec.save().then(()=>{
+                  return res.json({}) //success
+                }).catch((err)=>next(err));
 
-                return res.json({}) //success
               } else {
                 // candidate is not legit
                 throw new Error('Vote note submitted: candidate not found.');
@@ -867,7 +1011,7 @@ router.post("/vote",authenticated,(req,res)=>{
 
 });
 
-router.post("/expired",authenticated,(req,res) => {
+router.post("/expired",authenticated,(req,res,next) => {
 
   edits = async (ids) =>{
     for(let i=0;i<ids.length;i++) {
@@ -907,87 +1051,14 @@ router.post("/expired",authenticated,(req,res) => {
     }
   }
 
-
-  /*
-
-  editing = (id) => {
-    return new Promise((resolve,reject)=>{
-      Election.findById(id).exec((err,poll)=>{
-        if (err) throw err
-        if (poll) {
-          const start = new Date(poll.date).getTime();
-          const duration = poll.duration * 3600000;
-          const expiration = start + duration;
-          const current = new Date().getTime();
-          const expired = current < expiration ? false : true;
-          if (expired && poll.status) {
-            poll.status = false;
-            Classroom.findById(poll.class).populate({path:'ongoingElections archived',options:{sort:{'date':1}}}).exec((err,classroom)=>{
-              if (err) throw err
-              const idx = classroom.ongoingElections.findIndex(e => e._id == id);
-              if (idx > -1) {
-                poll.electionPermission = [];
-                poll.voteStatus = [];
-                classroom.ongoingElections.splice(idx,1);
-                if (classroom.archived.length < 100) {
-                  classroom.archived.push(filteredPoll);
-                } else {
-                  classroom.archived.splice(0,1,filteredPoll);
-                }
-
-
-                classroom.save((er,cl) => {
-                  if (er) throw er
-                  if (cl) {
-                    poll.save((err,p) => {
-                      if (err) throw err
-                      if (p) resolve(); //
-                      else reject();
-                    });
-                  } else {
-                    reject()
-                  }
-
-                });
-              }
-
-            });
-
-          } else {
-            reject()
-          }
-
-
-        } else {
-          // poll does not exist
-        }
-
-
-      });
-    })
-
-  }
-
-  updated = async (elections) => {
-    for (i=0;i<elections.length;i++) {
-      const t = await editing(elections[i]);
-      if (elections.length-1 == i) {
-        res.json({});
-      }
-    }
-
-  }
-
-  let polls = req.body.ids;
-  */
-  edits(req.body.ids).catch(()=>{
-    return res.status(422).json({});
+  edits(req.body.ids).catch((err)=>{
+    next(err)
   });
 
 
 });
 
-router.post("/delete-poll",authenticated,(req,res) => {
+router.post("/delete-poll",authenticated,(req,res,next) => {
 
 
       Classroom.findOne({name:req.body.name}).populate({
@@ -996,68 +1067,37 @@ router.post("/delete-poll",authenticated,(req,res) => {
           path: 'candidates'
         }
       }).exec((err,room) => {
+        if (err) next(err)
         if (room.master == req.user.id) {
 
           Election.findById(req.body.id).exec((error,poll)=>{
-            if (error) throw error
+            if (error) next(error)
             if (poll) {
               if (poll.status) {
                 bcrypt.compare(req.body.password,room.password,(e,r)=>{
-                  if (e) throw e
+                  if (e) next(e)
 
                   if (r) {
                     let updatedElections = room.ongoingElections.filter(elections => elections._id != req.body.id);
                     room.ongoingElections = updatedElections;
-                    room.save((e,r)=>{
-                      if (e) throw e
-
-                      if (r) {
-                        Election.deleteOne({_id:req.body.id});
-
-                        return res.json({elections:updatedElections});
-
-
-
-                      } else {
-                        return res.status(422).json({ errors: [{msg:"Oops. Something went wrong."}] });
-                      }
-
-                    });
+                    room.save().then(()=>{
+                      Election.deleteOne({_id:req.body.id},(err,result)=>{
+                        if (err) next(err)
+                      });
+                      return res.json({elections:updatedElections});
+                    }).catch((err)=>next(err));
                   } else {
                     return res.status(422).json({ errors: [{msg:"Unauthorized: incorrect password."}] });
                   }
                 })
+              } else {
+                return res.status(422).json({errors:[{msg:'This poll has already expired.'}]});
               }
             } else {
               return res.status(422).json({errors:[{msg:'Poll does not exist.'}]});
             }
 
           })
-          /*
-          bcrypt.compare(req.body.password,room.password,(e,r)=>{
-            if (e) throw e
-
-            if (r) {
-              let updatedElections = room.ongoingElections.filter(elections => elections._id != req.body.id);
-              room.ongoingElections = updatedElections;
-              room.save((e,r)=>{
-                if (e) throw e
-
-                if (r) {
-                  return res.json({elections:updatedElections});
-                  // Need to DELETE election from DB..but how?
-                  Election.deleteOne({id:req.body.id});
-
-                } else {
-                  return res.status(422).json({ errors: [{msg:"Oops. Something went wrong."}] });
-                }
-
-              });
-            } else {
-              return res.status(422).json({ errors: [{msg:"Unauthorized: incorrect password."}] });
-            }
-          })
-          */
 
         } else {
           return res.status(422).json({ errors: [{msg:"Unauthorized: you do not have permission to perform this action."}] });
@@ -1066,36 +1106,62 @@ router.post("/delete-poll",authenticated,(req,res) => {
 
 });
 
-router.post("/delete-class",authenticated,(req,res) => {
+router.post("/delete-class",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val) {
+    return val.toLowerCase()
+  }
+}),
+check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req,res,next) => {
 
-  Classroom.findOne({name:req.body.name},(err,room)=>{
-    if (err) throw err
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+
+  Classroom.findOne({ name:req.body.name },(err,room)=>{
+    if (err) next(err)
     if (room) {
       bcrypt.compare(req.body.password, room.password, (err,resp)=>{
-        if (err) throw err
+        if (err) next(err)
           if (resp) {
             if (room.master == req.user.id) {
 
               Student.find({$or:[{classrooms_master:room.id},{classrooms_student:room.id}]}).exec((err,students)=>{
+                if (err) next(err)
 
+                // removes from master list
                 students.forEach(async function(student) {
                   idxM = student.classrooms_master.indexOf(room.id);
                   if (idxM > -1) {
                     student.classrooms_master.splice(idxM,1);
-                    await student.save()
+                    await student.save().then(()=>{}).catch((err)=>next(err))
                   }
                 });
 
+                // removes from student list
                 students.forEach(async function (student) {
                   idxS = student.classrooms_student.indexOf(room.id);
                   if (idxS > -1) {
                     student.classrooms_student.splice(idxS,1);
-                    await student.save()
+                    await student.save().then(()=>{}).catch((err)=>next(err))
                   }
                 });
 
+
+                // deletes all elections associated with master classrooms
+                if (room.ongoingElections >0) {
+                  Election.deleteMany({id:room.ongoingElections},(err,docs)=>{
+                    if (err) next(err)
+                  });
+                }
+                if (room.archived > 0) {
+                  Election.deleteMany({id:room.archived},(err,docs)=>{
+                    if (err) next(err)
+                  });
+                }
+
                 room.remove((err,result)=>{
-                  if (err) throw err
+                  if (err) next(err)
                   return res.json({}); //success
                 });
 
@@ -1116,31 +1182,38 @@ router.post("/delete-class",authenticated,(req,res) => {
 
 });
 
-router.post("/leave-class",authenticated,(req,res)=>{
+router.post("/leave-class",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+  if (val) {
+    return val.toLowerCase()
+  }
+}),
+check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req,res,next)=>{
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   // password, name
 
   bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
-    if (err) throw err
+    if (err) next(err)
     if (resp) {
       Student.findById(req.user.id).populate('classrooms_student').exec((err,student)=>{
-        if (err) throw err
+        if (err) next(err)
         if (student) {
           student.classrooms_student = student.classrooms_student.filter(room => room.name != req.body.name);
-          student.save();
+          student.save().then().catch((err)=>next(err));
           Classroom.find({name:req.body.name}).exec((err,room)=>{
-            if (err) throw err
-            if (room.length > 0) {
-              room.joined = room.joined - 1;
-              room.save();
+            if (err) next(err)
+            room.joined = room.joined - 1;
+            room.save().then(()=>{
               return res.json({});
-            }
+            }).catch((err)=>next(err));
           });
-
         } else {
           return res.status(422).json({errors:[{msg:'User not found.'}]});
         }
-
       })
     } else {
       return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
