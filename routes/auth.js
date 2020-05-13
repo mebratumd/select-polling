@@ -167,7 +167,7 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
                         hash: uuidv4(),
                         studentnumber: req.body.studentnumber,
                         school: req.body.school,
-                        active: true, // change to false
+                        active: false, // change to false
                         status: true,
                         registered: new Date(),
                         delete: new Date(),
