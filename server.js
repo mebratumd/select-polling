@@ -37,6 +37,14 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
+app.use((req,res,next)=>{
+  if (!req.secure) {
+    res.redirect("https://www.selectpolling.ca");
+  } else {
+    next();
+  }
+});
+
 
 app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
