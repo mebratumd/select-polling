@@ -361,7 +361,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
             }
 
-            let currentClassCount = req.body.partake ? 1 : 0;
+            let currentClassCount = req.body.partake == "true" ? 1 : 0;
 
             if (finalClassList.length > 500) {
               throw new Error('Classrooms must be less than 500 students.');
