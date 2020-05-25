@@ -66,9 +66,7 @@ const https = (req,res,next) => {
   if (req.secure && req.protocol == "https") {
     next();
   } else {
-    console.log(req.url);
-    console.log(req.secure);
-    res.redirect(`https://www.selectpolling.ca`);
+    res.redirect(`https://www.selectpolling.ca${req.url}`);
   }
 }
 
