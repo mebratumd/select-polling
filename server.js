@@ -63,7 +63,7 @@ app.set('trust proxy', true); //
 
 
 const https = (req,res,next) => {
-  if (req.headers["x-forwarded-proto"] === "https") {
+  if (req.headers["x-forwarded-proto"] === "https" && req.protocol === "https") {
     return next();
   } else {
     res.redirect(`https://www.selectpolling.ca${req.url}`);
