@@ -13,6 +13,8 @@ const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 
+//require('dotenv').config();
+
 
 
 const app = express();
@@ -37,22 +39,14 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-app.use((req,res,next)=>{
-  if (!req.secure) {
-    res.redirect("https://www.selectpolling.ca");
-  } else {
-    next();
-  }
-});
-
 
 app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
-  secret: 'keyboard cat',
+  secret: 'konjo habesha',
   resave: false,
   saveUninitialized: false,
   store: new MongoStore({
-    url: "mongodb+srv://mat:students@select-ddero.mongodb.net/test?retryWrites=true&w=majority",
+    url: process.env.MONGODB_URI,
     collection: "sessions",
     ttl:3600,
     autoRemove: 'interval',
@@ -71,6 +65,7 @@ app.use("/class",classroom);
 
 // DB failures
 app.use((error,req,res,next)=>{
+  console.log(error);
   res.status(500).json({errors:[{msg:'Something went wrong.'}]});
 });
 
@@ -82,6 +77,7 @@ io.of("/update").on("connection",(socket)=>{
   socket.on("check",(classID)=>{
     Classroom.findById(classID).populate({
       path: 'ongoingElections',
+      options:{sort:{'date':-1}}
     }).exec((err,classroom)=>{
       if (err) throw err
       if (classroom) {

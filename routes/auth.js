@@ -19,6 +19,7 @@ const authenticated = (req,res,next) => {
 
 }
 
+
 router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req, res, next) => {
 
@@ -43,16 +44,15 @@ check('password').isLength({min:4,max:12}).withMessage("Password must be between
   })(req, res, next);
 });
 
-router.post("/register", [check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,12}@/).withMessage('Email address must be alphanumeric and between 4-12 characters in length.').normalizeEmail(),
+router.post("/register", [check('email').isEmail().withMessage("Invalid email.").normalizeEmail(),
 check('status').isIn(['yes','no']).withMessage('Please submit a valid status.'),
 check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
 check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("First name must only contain letters.").customSanitizer(val => val.toLowerCase()),
 check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Last name must only contain letters.").customSanitizer(val => val.toLowerCase()),
 check("school").isIn(['University of Manitoba']).withMessage("School not found."),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match."),
-check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election key must be between 6-20 characters.').isAlpha().withMessage('Election key must be alphanumeric.')],
-(req,res,next) => {
+check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")
+],(req,res,next) => {
 
   // errors with submitted form from user
   const errors = validationResult(req);
@@ -81,11 +81,23 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
     if (req.body.status == 'no') {
       return res.status(422).json({errors:[{msg:`No student number required.`}]});
     } else {
-      // this range for student numbers is pretty subjective and based entirely off of U of M's range
+
       const re = new RegExp('^[\\d]{5,10}$');
       if (!re.test(req.body.studentnumber)) {
         return res.status(422).json({errors:[{msg:`Student number must be between 5-10 digits.`}]});
       }
+
+      if (req.body.electionKey) {
+        const re = new RegExp('^[\\w]+$');
+        if(!re.test(req.body.electionKey)) {
+          return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
+        }
+        if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
+          return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
+        }
+
+      }
+
     }
   } else {
     if (req.body.status == 'yes') {
@@ -114,8 +126,8 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
         <div>
           <h1 style="text-align:center;">Select Polling</h1>
           <h2>Hi, ${name}</h2>
-          <p>Thank you for signing up with <a href="https://select-poll.herokuapp.com/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
-          If for any reason you are having troubles activating your account please <a href="https://select-poll.herokuapp.com/contact">Contact Us</a>.</p><br>
+          <p>Thank you for signing up with <a href="https://www.selectpolling.ca/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
+          If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca</b></p><br>
           <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>${activationLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not sign up, please disregard this message.</small>
@@ -134,75 +146,72 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
 
       if (req.body.status == 'yes') {
 
-        if (req.body.electionKey) {
-          bcrypt.genSalt(10, (error,salt)=>{
+        bcrypt.genSalt(10, (error,salt)=>{
+
+          if (error) next(error)
+
+          bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
+
             if (error) next(error)
-            bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
+
+            Student.find({ email: req.body.email }, (error,student)=>{
+
               if (error) next(error)
-              Student.find({ email: req.body.email }, (error,student)=>{
 
-                if (error) next(error)
+              if (student.length == 0) {
 
-                if (student.length == 0) {
+                bcrypt.genSalt(10, (err, salt) => {
 
-                  bcrypt.genSalt(10, (err, salt) => {
+                  if (err) next(err)
+
+                  bcrypt.hash(req.body.password, salt, (err, passwordHash) => {
+
                     if (err) next(err)
-                    bcrypt.hash(req.body.password, salt, (err, passwordHash) => {
-                      if (err) next(err)
 
-                      let firstFirstLetter = req.body.firstname[0].toUpperCase();
-                      let firstRestLetter = req.body.firstname.slice(1);
-                      let firstname = `${firstFirstLetter}${firstRestLetter}`;
-
-                      let lastFirstLetter = req.body.lastname[0].toUpperCase();
-                      let lastRestLetter = req.body.lastname.slice(1);
-                      let lastname = `${lastFirstLetter}${lastRestLetter}`;
-
-                      const newStudent = new Student({
-                        username: req.body.username,
-                        firstname: firstname,
-                        lastname: lastname,
-                        email: req.body.email,
-                        password: passwordHash,
-                        hash: uuidv4(),
-                        studentnumber: req.body.studentnumber,
-                        school: req.body.school,
-                        active: false, // change to false
-                        status: true,
-                        registered: new Date(),
-                        delete: new Date(),
-                        key:electionKeyHash
-                      });
-
-                      newStudent.save((error,student)=>{
-                        if (error) next(error)
-
-                        if (student) {
-                          emailSend(req.body.email,`https://select-poll.herokuapp.com/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please login.`});
-                          }).catch((err) => {
-                            return next(err)
-                          });
-
-                        } else {
-                          return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
-                        }
-                      });
-
-
+                    const newStudent = new Student({
+                      username: req.body.username,
+                      firstname: req.body.firstname,
+                      lastname: req.body.lastname,
+                      email: req.body.email,
+                      password: passwordHash,
+                      hash: uuidv4(), //activate hash
+                      studentnumber: req.body.studentnumber,
+                      school: req.body.school,
+                      active: false,
+                      status: true,
+                      registered: new Date(),
+                      delete: new Date(),
+                      key:electionKeyHash
                     });
+
+                    newStudent.save((error,student)=>{
+                      if (error) next(error)
+
+                      if (student) {
+
+                        emailSend(req.body.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
+                          return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation.`});
+                        }).catch((err) => {
+                          return next(err)
+                        });
+
+
+                      } else {
+                        return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
+                      }
+                    });
+
+
                   });
+                });
 
-                } else {
-                  return res.status(422).json({errors:[{msg:"This email is already in use."}]});
-                }
-              });
-
+              } else {
+                return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+              }
             });
-          })
-        } else {
-          return res.status(422).json({errors:[{msg:"Missing election key."}]});
-        }
+
+          });
+        })
 
 
 
@@ -220,18 +229,10 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
 
                 if (err) next(err)
 
-                let firstFirstLetter = req.body.firstname[0].toUpperCase();
-                let firstRestLetter = req.body.firstname.slice(1);
-                let firstname = `${firstFirstLetter}${firstRestLetter}`;
-
-                let lastFirstLetter = req.body.lastname[0].toUpperCase();
-                let lastRestLetter = req.body.lastname.slice(1);
-                let lastname = `${lastFirstLetter}${lastRestLetter}`;
-
                 const newMaster = new Student({
                   username: req.body.username,
-                  firstname: firstname,
-                  lastname: lastname,
+                  firstname: req.body.firstname,
+                  lastname: req.body.lastname,
                   email: req.body.email,
                   password: hash,
                   school: req.body.school,
@@ -247,8 +248,8 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
 
                   if (master) {
 
-                    emailSend(req.body.email,`https://select-poll.herokuapp.com/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                      return res.json({msg:`Thank you for signing up, ${master.firstname}. Please login.`});
+                    emailSend(req.body.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
+                      return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation.`});
                     }).catch(err => next(err));
 
 
@@ -276,17 +277,26 @@ check('electionKey').optional().isLength({min:6,max:20}).withMessage('Election k
 
 router.get("/a/:username/:hash",(req,res,next)=>{
 
-  Student.find({username:req.params.username.toLowerCase()}).exec((err,user)=>{
+  Student.findOne({username:req.params.username}).exec((err,user)=>{
     if (err) next(err)
-    if (user.length > 0) {
-      if (user[0].hash == req.params.hash) {
-        user[0].active = true;
-        user[0].save().then(()=>{
-          return res.send(`<p>Thank you for activating your account, ${user[0].firstname}. <a href="https://select-poll.herokuapp.com/login">Login</a></p>`)
-        }).catch((err) => res.send(`<p>There was an error. Please re-submit the link.</p>`));
+    if (user) {
+      if (user.active) {
+        return res.send(`<p>Your account has already been activated, ${user.firstname}. <a href="https://www.selectpolling.ca/login">Login</a></p>`)
       }
+
+      if (user.hash == req.params.hash) {
+        user.active = true;
+        user.delete = undefined;
+        user.hash = undefined;
+        user.save().then(()=>{
+          return res.send(`<p>Thank you for activating your account, ${user.firstname}. <a href="https://www.selectpolling.ca/login">Login</a></p>`)
+        }).catch((err) => res.send(`<p>There was an error. Please re-submit the link.</p>`));
+      } else {
+        return res.status(422).json({errors:[{msg:'Forbidden.'}]});
+      }
+
     } else {
-      return res.send(`<p>User not found.</p>`)
+      return res.status(422).json({errors:[{msg:'This user does not exist.'}]});
     }
   });
 
@@ -304,7 +314,7 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
       select: '-tokens -__v',
       options:{sort:{'date':-1}}
     }
-  }).select('-password -_id -__v -active -hash -delete').lean().exec((err,student)=>{
+  }).select('-password -__v -active -key').lean().exec((err,student)=>{
 
     if (err) next(err)
 
@@ -435,5 +445,167 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
   })
 
 });
+
+router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,12}@/).withMessage('Email address must be alphanumeric and between 4-12 characters in length.').normalizeEmail()],(req,res,next)=>{
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+
+  let resetEmail = async (email,resetLink,name) => {
+
+    let transporter = nodemailer.createTransport({
+        host: "mail.privateemail.com",
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    let info = await transporter.sendMail({
+        from: '"Select Polling 📈" <noreply@selectpolling.ca>', // sender address
+        to: `${email}`, // list of receivers
+        subject: "Password Reset ✔", // Subject line
+        text: `Hi, ${name}. Please click the URL or copy and paste it into your browser to activate your account: ${resetLink}`, // plain text body
+        html: `
+        <div>
+          <h1 style="text-align:center;">Select Polling</h1>
+          <h2>Hi, ${name}</h2>
+          <p>To complete the password reset of your account click the URL below or copy and paste it into your browser.
+          If for any reason you are having troubles please contact us at <b>contact@selectpolling.ca</b>.</p><br>
+          <span style="margin-top:10px;padding:10px;"><a href=${resetLink}>${resetLink}</a></span>
+          <br><br>
+          <small style="display:block;margin-top:20px;">If you did not ask for a password reset, please disregard this message.</small>
+        </div>` // html body
+    });
+  }
+
+  Student.findOne({email:req.body.email}).exec((err,student)=>{
+    if (err) next(err)
+    if (student){
+      const time = new Date().getTime();
+
+      if (student.forgotPassword != "") {
+
+        if (time - student.forgotPasswordTimer > 600000) {
+          student.forgotPassword = uuidv4();
+          student.forgotPasswordTimer = new Date().getTime();
+          student.save().then((student_) => {
+
+            resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+              return res.json({});
+            }).catch((err)=>next(err));
+
+
+          }).catch((err)=>next(err))
+        } else {
+          // 10 minutes has not passed
+          return res.status(422).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
+        }
+
+      } else {
+        student.forgotPassword = uuidv4();
+        student.forgotPasswordTimer = new Date().getTime();
+        student.save().then((student_) => {
+
+          resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+            return res.json({});
+          }).catch((err)=>next(err));
+
+
+        }).catch((err)=>next(err))
+      }
+
+
+
+
+    } else {
+      return res.status(422).json({ errors: [{msg:'This email is not registered with a user.'}]});
+    }
+  })
+
+
+
+});
+
+router.get("/fpwd/:username/:hash",(req,res,next)=>{
+
+  // This is to access the view on the front end
+
+  Student.findOne({username:req.params.username}).exec((err,student)=>{
+    if (err) next(err)
+    if (student) {
+
+      if (student.forgotPassword !== req.params.hash) {
+        return res.status(403).send("Unauthorized.");
+      } else {
+        return res.json({username:student.username,forgotPassword:student.forgotPassword});
+      }
+
+    } else {
+      return res.status(404).send("No such user.");
+    }
+
+
+  });
+
+
+});
+
+router.post("/fpwd/change",[check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")],(req,res,next)=>{
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
+
+  if (req.body.username) {
+
+    if (req.body.forgotPassword) {
+
+      Student.findOne({username:req.body.username}).exec((err,student)=>{
+        if (err) next(err)
+
+        if (student) {
+
+          if (student.forgotPassword != req.body.forgotPassword) {
+            // error keys do not match
+            return res.status(403).json({errors:[{msg:"You do not have permission to perform this action."}]});
+          } else {
+            bcrypt.genSalt(10, (err, salt) => {
+                bcrypt.hash(req.body.password, salt, (err, hash) => {
+                    student.password = hash;
+                    student.forgotPassword = "";
+                    student.forgotPasswordTimer = 0;
+                    student.save().then(() => {
+                      return res.json({});
+                    }).catch(err => next(err));
+                });
+            });
+          }
+
+        } else {
+          // error student does not exist
+          return res.status(404).json({errors:[{msg:"No such user."}]});
+        }
+
+      })
+
+    } else {
+      // error no key provided
+      return res.status(401).json({errors:[{msg:"Unauthorized: Key not provided."}]});
+    }
+
+  } else {
+    // error no username provided
+    return res.status(401).json({errors:[{msg:"Unauthorized: No username."}]});
+  }
+
+});
+
 
 module.exports = router;

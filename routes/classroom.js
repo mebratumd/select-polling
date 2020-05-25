@@ -37,7 +37,6 @@ const authenticated = (req,res,next) => {
 }
 
 const errorFile = (err,req,res,next) => {
-  console.log(err);
   if (err.code == 'LIMIT_FILE_SIZE') {
     return res.status(422).json({errors:[{msg:"File exceeds 100 MB."}]});
   } else if (err.code == 'LIMIT_FILE_COUNT') {
@@ -51,7 +50,7 @@ const errorFile = (err,req,res,next) => {
 
 // dashboard endpoints
 
-router.post("/search",authenticated,[check('name').matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/search",authenticated,[check('name').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
   if (val){
     return val.toLowerCase();
   }
@@ -85,7 +84,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.findOne({name:req.body.name}).exec((err,room)=>{
+  Classroom.findOne({name:req.body.name}).populate("ongoingElections").exec((err,room)=>{
     if (err) next(err)
     if (room) {
       bcrypt.compare(req.body.password,room.password,(err,resp)=>{
@@ -95,6 +94,22 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
             return student.email == req.user.email && student.studentnumber == req.user.studentnumber;
           });
           if (student.length > 0) {
+            if (room.ongoingElections.length > 0) {
+              // token
+              // access
+              // vote status
+              const tkn = uuidv4();
+              room.ongoingElections.forEach(async function(e){
+                ongoingElec = await Election.findById(e._id).exec();
+                didVote = ongoingElec.voteStatus.filter(voteOb => voteOb.studentnumber == req.user.studentnumber);
+                if (didVote.length == 0) {
+                  ongoingElec.tokens.push({studentnumber:req.user.studentnumber,hash:tkn});
+                  ongoingElec.electionAccess.push({studentnumber:req.user.studentnumber,permission:false});
+                  ongoingElec.voteStatus.push({studentnumber:req.user.studentnumber,didVote:false});
+                  await ongoingElec.save()
+                }
+              })
+            }
             // success
             Student.findById(req.user.id).exec((e,s)=>{
               if (e) next(e)
@@ -103,7 +118,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
                 if (s.classrooms_student.length < 5) {
                   s.classrooms_student.push(room.id);
                   room.joined = room.joined + 1;
-                  room.save();
+                  room.save().catch(err => next(err));
                   s.save().then(() => {
                     return res.json({})
                   }).catch((err) => next(err));
@@ -292,9 +307,6 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
       and are planning to partake in elections leave your information out of the student list; it will be added on our end.`);
     }
 
-
-
-
   }
 
 
@@ -462,6 +474,8 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
             const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
             room.students = newClassList;
+            const dec = room.joined - 1;
+            room.joined = dec;
             room.save().then(()=>{
               return res.json({removedStudent:req.body});
             }).catch((err)=>next(err));
@@ -530,7 +544,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               }
 
               if (student.studentnumber == req.body.studentnumber) {
-                throw new Error('Duplicate studentnumbers found.');
+                throw new Error('Duplicate student numbers found.');
               }
 
             });
@@ -569,7 +583,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               if (err) next(err)
               let addedStudent;
               if (student.length > 0) {
-                addedStudent = {email:student.email,studentnumber:student.studentnumber,name:req.body.name};
+                addedStudent = {email:student[0].email,studentnumber:student[0].studentnumber,name:req.body.name};
                 room.students.push(addedStudent);
               } else {
                 addedStudent = {email:req.body.email,studentnumber:req.body.studentnumber,name:req.body.name};
@@ -686,7 +700,6 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
       restrictedCandidates[id] = true;
     }
   });
-
 
 
   return res.json({election:{candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls}});
@@ -891,9 +904,13 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
             let valid = room[0].students.filter(student => student.studentnumber == req.user.studentnumber);
             if (valid.length > 0) {
               let firstElection = room[0].ongoingElections[0];
-              console.log(firstElection);
               let token = firstElection.tokens.filter(token => token.studentnumber == req.user.studentnumber)[0];
-              return res.json({key:token.hash});
+              if (token) {
+                return res.json({key:token.hash});
+              } else {
+                return res.status(422).json({errors:[{msg:'Cannot access this poll as you were added to the class list after the creation of the poll.'}]});
+              }
+
             } else {
               return res.status(422).json({errors:[{msg:'You are not apart of the class list.'}]});
             }
@@ -1027,8 +1044,8 @@ router.post("/expired",authenticated,(req,res,next) => {
           let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'ongoingElections archived',options:{sort:{'date':1}}}).exec();
           const idx = expiredElecClass.ongoingElections.findIndex(e => e._id == ids[i]);
           if (idx > -1) {
-            expiredElec.electionAccess = [];
-            expiredElec.voteStatus = [];
+            expiredElec.electionAccess = undefined;
+            expiredElec.voteStatus = undefined;
             let savedExpiredElec = await expiredElec.save();
             let filteredPoll = await Election.findById(ids[i]).exec();
             expiredElecClass.ongoingElections.splice(idx,1);
