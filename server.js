@@ -46,7 +46,9 @@ app.use((req,res,next)=>{
     if (req.secure && req.protocol == "https") {
       next();
     } else {
-      res.redirect(`https://selectpolling.ca`);
+      console.log(req.protocol);
+      console.log(req.secure);
+      return res.redirect(`https://selectpolling.ca`);
     }
 });
 
