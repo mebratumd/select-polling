@@ -96,6 +96,8 @@ check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).with
           return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
         }
 
+      } else {
+        return return res.status(422).json({errors:[{msg:`Election key required.`}]});
       }
 
     }
