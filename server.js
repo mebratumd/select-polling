@@ -42,16 +42,6 @@ const PORT = process.env.PORT;
 
 app.use(express.static(path.join(__dirname,'public')));
 
-app.use((req,res,next)=>{
-    if (req.secure && req.protocol == "https") {
-      next();
-    } else {
-      console.log(req.protocol);
-      console.log(req.secure);
-      return res.redirect(`https://selectpolling.ca`);
-    }
-});
-
 app.use(session({
   secret: 'konjo habesha',
   resave: false,
@@ -71,8 +61,19 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.set('trust proxy', true); //
 
-app.use("/", auth);
-app.use("/class",classroom);
+
+const https = (req,res,next) => {
+  if (req.secure && req.protocol == "https") {
+    next();
+  } else {
+    console.log(req.protocol);
+    console.log(req.secure);
+    res.redirect(`https://selectpolling.ca`);
+  }
+}
+
+app.use("/",https,auth);
+app.use("/class",https,classroom);
 
 // DB failures
 app.use((error,req,res,next)=>{
