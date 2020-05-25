@@ -97,7 +97,7 @@ check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).with
         }
 
       } else {
-        return return res.status(422).json({errors:[{msg:`Election key required.`}]});
+        return res.status(422).json({errors:[{msg:`Election key required.`}]});
       }
 
     }
