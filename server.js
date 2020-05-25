@@ -46,6 +46,7 @@ app.use((req,res,next)=>{
     if (req.secure) {
       next();
     } else {
+      console.log(`https://selectpolling.ca${req.url}`);
       res.redirect(`https://selectpolling.ca${req.url}`);
     }
 });
