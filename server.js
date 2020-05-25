@@ -41,6 +41,15 @@ const PORT = process.env.PORT;
 
 
 app.use(express.static(path.join(__dirname,'public')));
+
+app.use((req,res,next)=>{
+    if (req.secure) {
+      next();
+    } else {
+      res.redirect(`https://selectpolling.ca${req.url}`);
+    }
+});
+
 app.use(session({
   secret: 'konjo habesha',
   resave: false,
