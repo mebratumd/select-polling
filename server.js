@@ -43,6 +43,13 @@ const PORT = process.env.PORT;
 
 
 app.use(sslRedirect());
+app.use((req,res,next)=>{
+  if (!req.headers.host.match(/^www\./)) {
+    res.redirect(`https://www.selectpolling.ca${req.url}`);
+  } else {
+    next()
+  }
+})
 
 app.use(express.static(path.join(__dirname,'public')));
 
