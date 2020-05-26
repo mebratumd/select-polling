@@ -475,7 +475,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
             const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
             room.students = newClassList;
             const dec = room.joined - 1;
-            room.joined = dec;
+            room.joined = room.joined == 0 ? 0 : dec;
             room.save().then(()=>{
               return res.json({removedStudent:req.body});
             }).catch((err)=>next(err));
