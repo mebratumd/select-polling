@@ -12,6 +12,7 @@ const rateLimit = require("express-rate-limit");
 const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
+var sslRedirect = require('heroku-ssl-redirect');
 
 //require('dotenv').config();
 
@@ -70,8 +71,10 @@ const https = (req,res,next) => {
   }
 }
 
-app.use("/",https,auth);
-app.use("/class",https,classroom);
+app.use(sslRedirect());
+
+app.use("/",auth);
+app.use("/class",classroom);
 
 // DB failures
 app.use((error,req,res,next)=>{
