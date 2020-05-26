@@ -550,7 +550,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
             });
 
             // Valid email
-            const schoolExtensions = {'University of Manitoba': ['myumanitoba.ca','cc.umanitoba.ca','umanitoba.ca']};
+            const schoolExtensions = {'University of Manitoba': ['myumanitoba.ca']};
             const extForGivenSchool = schoolExtensions[room.school];
 
             if (typeof extForGivenSchool == 'object') {
