@@ -12,10 +12,21 @@ const rateLimit = require("express-rate-limit");
 const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
-var sslRedirect = require('heroku-ssl-redirect');
+const sslRedirect = require('heroku-ssl-redirect');
+const cors = require("cors");
 
 //require('dotenv').config();
 
+var whitelist = ['https://selectpolling.ca', 'https://www.selectpolling.ca'];
+var corsOptions = {
+  origin: function (origin, callback) {
+    if (whitelist.indexOf(origin) !== -1) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  }
+}
 
 
 const app = express();
@@ -40,6 +51,8 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
+app.use(cors(corsOptions));
+
 app.use(sslRedirect());
 
 app.use(express.static(path.join(__dirname,'public')));
@@ -62,16 +75,6 @@ app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
 app.set('trust proxy', true); //
-
-
-const https = (req,res,next) => {
-  if (req.headers["x-forwarded-proto"] === "https" && req.secure) {
-    next();
-  } else {
-    return res.redirect(`https://www.selectpolling.ca${req.url}`);
-  }
-}
-
 
 
 app.use("/",auth);
