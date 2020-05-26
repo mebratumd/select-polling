@@ -42,8 +42,22 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 const PORT = process.env.PORT;
 
 
-app.use(cors());
-app.use(sslRedirect());
+app.use((req,res,next)=>{
+  if (req.headers['x-forwarded-proto'] !== 'https') {
+    if (req.hostname.indexOf("https://www") == -1) {
+      res.redirect('https://www.selectpolling.ca' + req.originalUrl);
+    } else {
+      res.redirect('https://' + req.hostname + req.originalUrl);
+    }
+  } else {
+    if (req.hostname.indexOf("https://www") == -1) {
+      res.redirect('https://www.selectpolling.ca' + req.originalUrl);
+    } else {
+      next();
+    }
+
+  }
+})
 
 app.use(express.static(path.join(__dirname,'public')));
 
