@@ -214,7 +214,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
     return res.status(422).json({ errors: errors.array() });
   }
 
-  let schoolExtensions = {'University of Manitoba': ['myumanitoba.ca','cc.umanitoba.ca','umanitoba.ca']};
+  let schoolExtensions = {'University of Manitoba': ['myumanitoba.ca']};
 
   let finalClassList = [];
 

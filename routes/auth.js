@@ -61,7 +61,7 @@ check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).with
   }
 
   // school extensions added here
-  const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca','@umanitoba.ca','@cc.umanitoba.ca']};
+  const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
 
   if (typeof schoolExtensions[req.body.school] == "object") {
     validEmail = schoolExtensions[req.body.school].some((extension)=>{
