@@ -17,16 +17,6 @@ const cors = require("cors");
 
 //require('dotenv').config();
 
-var whitelist = ['https://selectpolling.ca', 'https://www.selectpolling.ca'];
-var corsOptions = {
-  origin: function (origin, callback) {
-    if (whitelist.indexOf(origin) !== -1) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  }
-}
 
 
 const app = express();
@@ -51,7 +41,7 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-app.use(cors(corsOptions));
+app.use(cors());
 
 app.use(sslRedirect());
 
