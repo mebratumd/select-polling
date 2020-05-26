@@ -40,6 +40,7 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
+app.use(sslRedirect());
 
 app.use(express.static(path.join(__dirname,'public')));
 
@@ -71,7 +72,7 @@ const https = (req,res,next) => {
   }
 }
 
-app.use(sslRedirect());
+
 
 app.use("/",auth);
 app.use("/class",classroom);
