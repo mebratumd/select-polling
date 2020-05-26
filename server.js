@@ -13,7 +13,6 @@ const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
-const cors = require("cors");
 
 //require('dotenv').config();
 
@@ -41,9 +40,13 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-app.use(cors());
 
 app.use(sslRedirect());
+app.use((req,res,next)=>{
+  console.log(req.host);
+  next();
+})
+
 
 app.use(express.static(path.join(__dirname,'public')));
 
