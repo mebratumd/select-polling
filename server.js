@@ -43,7 +43,7 @@ const PORT = process.env.PORT;
 
 app.use(sslRedirect());
 app.use((req,res,next)=>{
-  if ("https://www.".indexOf(req.host) == -1) {
+  if (req.host.indexOf("https://www") == -1) {
     res.redirect(`https://www.selectpolling.ca${req.url}`);
   } else {
     next();
