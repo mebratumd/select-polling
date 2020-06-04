@@ -1439,7 +1439,7 @@ check('password').isLength({min:4,max:12}).withMessage("Password must be between
 
 
                 // deletes all elections associated with master classrooms
-                if (room.elections >0) {
+                if (room.elections.length >0) {
                   Election.deleteMany({id:room.elections},(err,docs)=>{
                     if (err) next(err)
                   });
