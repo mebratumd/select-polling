@@ -951,10 +951,12 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
       });
   }
   console.log(req.params);
-  
+
   if (req.params.key == "key") {
     bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
-      if (error) next(error)
+      if (error) {
+        next(error);
+      }
       if (response) {
         Classroom.find({name:req.body.name}).populate('elections').exec((err,room)=>{
           if (err) next(err);
