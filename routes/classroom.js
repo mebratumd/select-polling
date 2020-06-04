@@ -474,17 +474,22 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
                   const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
                   student.classrooms_student = newClassList;
                   student.save().then(()=>{
-
+                    const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
+                    room.students = newClassList;
+                    room.save().then(()=>{
+                      return res.json({removedStudent:req.body,joined:true});
+                    }).catch((err)=>next(err));
+                  }).catch((err)=>next(err));
+                } else {
+                  const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
+                  room.students = newClassList;
+                  room.save().then(()=>{
+                    return res.json({removedStudent:req.body,joined:false});
                   }).catch((err)=>next(err));
                 }
-
               });
 
-              const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
-              room.students = newClassList;
-              room.save().then(()=>{
-                return res.json({removedStudent:req.body});
-              }).catch((err)=>next(err));
+
 
             } else {
               throw new Error("You cannot remove students from the classroom.");
