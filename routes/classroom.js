@@ -955,6 +955,7 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
   if (req.params.key == "key") {
     bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
       if (error) {
+        console.log(error);
         next(error);
       }
       if (response) {
