@@ -956,7 +956,7 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
       if (error) next(error)
       if (response) {
         Classroom.find({name:req.body.name}).populate('elections').exec((err,room)=>{
-          if (err) next(err)
+          if (err) next(err);
           if (room.length > 0) {
             let valid = room[0].students.filter(student => student.studentnumber == req.user.studentnumber);
             if (valid.length > 0) {
