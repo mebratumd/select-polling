@@ -9,6 +9,7 @@ const passport = require('passport');
 const mongoose = require('mongoose');
 const nodemailer = require('nodemailer');
 const uuidv4 = require('uuid/v4');
+const request = require('request');
 
 const authenticated = (req,res,next) => {
   if (req.isAuthenticated()) {
@@ -21,27 +22,40 @@ const authenticated = (req,res,next) => {
 
 
 router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
-check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req, res, next) => {
+check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
   }
 
-  passport.authenticate('local', (err, user, info) => {
-    if (err) { return next(err); }
-    if (!user) {
-      if (info.active) {
-        return res.status(401).json({errors:[info]}); // incorrect password or user doesn't exist
-      } else {
-        return res.status(423).send(info.message); // activate your account
-      }
+  request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+    if (JSON.parse(body).score <= 0.3) {
+      return res.status(422).json({errors:[{msg:'Something wrong.'}]});
+    } else {
+
+      passport.authenticate('local', (err, user, info) => {
+        if (err) { return next(err); }
+        if (!user) {
+          if (info.active) {
+            return res.status(401).json({errors:[info]}); // incorrect password or user doesn't exist
+          } else {
+            return res.status(423).send(info.message); // activate your account
+          }
+        }
+        req.logIn(user, (err) => {
+          if (err) { return next(err); }
+          return res.json({});
+        });
+      })(req, res, next);
+
+
     }
-    req.logIn(user, (err) => {
-      if (err) { return next(err); }
-      return res.json({});
-    });
-  })(req, res, next);
+
+  });
+
+
 });
 
 router.post("/register", [check('email').isEmail().withMessage("Invalid email.").normalizeEmail(),
@@ -51,60 +65,14 @@ check("firstname").isLength({min:2,max:16}).withMessage("First name must be betw
 check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Last name must only contain letters.").customSanitizer(val => val.toLowerCase()),
 check("school").isIn(['University of Manitoba']).withMessage("School not found."),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")
+check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match."),
+check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")
 ],(req,res,next) => {
 
   // errors with submitted form from user
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
-  }
-
-  // school extensions added here
-  const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
-
-  if (typeof schoolExtensions[req.body.school] == "object") {
-    validEmail = schoolExtensions[req.body.school].some((extension)=>{
-      const re = new RegExp(`${extension}$`);
-      return re.test(req.body.email);
-    });
-  } else {
-    const re = new RegExp(`${schoolExtensions[req.body.school]}$`);
-    validEmail = re.test(req.body.email);
-  }
-
-  if (!validEmail) {
-    return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
-  }
-
-  if (req.body.studentnumber) {
-    if (req.body.status == 'no') {
-      return res.status(422).json({errors:[{msg:`No student number required.`}]});
-    } else {
-
-      const re = new RegExp('^[\\d]{5,10}$');
-      if (!re.test(req.body.studentnumber)) {
-        return res.status(422).json({errors:[{msg:`Student number must be between 5-10 digits.`}]});
-      }
-
-      if (req.body.electionKey) {
-        const re = new RegExp('^[\\w]+$');
-        if(!re.test(req.body.electionKey)) {
-          return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
-        }
-        if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
-          return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
-        }
-
-      } else {
-        return res.status(422).json({errors:[{msg:`Election key required.`}]});
-      }
-
-    }
-  } else {
-    if (req.body.status == 'yes') {
-      return res.status(422).json({errors:[{msg:`Missing student number.`}]});
-    }
   }
 
   let emailSend = async (email,activationLink,name) => {
@@ -140,139 +108,209 @@ check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).with
 
   }
 
-  // Username search
-  Student.find({ username: req.body.username }, (error,student) => {
-    if (error) next(error)
+  let p = new Promise((resolve,reject)=>{
+    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+        let json = JSON.parse(body);
+        if (json.success) {
+          if (json.score <= 0.3) {
+            reject();
+          } else {
+            resolve();
+          }
+        } else {
+          reject();
+        }
+    });
+  });
 
-    if (student.length == 0) {
+  // school extensions added here
+  const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
 
+  p.then(()=>{
+    if (typeof schoolExtensions[req.body.school] == "object") {
+      validEmail = schoolExtensions[req.body.school].some((extension)=>{
+        const re = new RegExp(`${extension}$`);
+        return re.test(req.body.email);
+      });
+    } else {
+      const re = new RegExp(`${schoolExtensions[req.body.school]}$`);
+      validEmail = re.test(req.body.email);
+    }
+
+    if (!validEmail) {
+      return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
+    }
+
+    if (req.body.studentnumber) {
+      if (req.body.status == 'no') {
+        return res.status(422).json({errors:[{msg:`No student number required.`}]});
+      } else {
+
+        const re = new RegExp('^[\\d]{5,10}$');
+        if (!re.test(req.body.studentnumber)) {
+          return res.status(422).json({errors:[{msg:`Student number must be between 5-10 digits.`}]});
+        }
+
+        if (req.body.electionKey) {
+          const re = new RegExp('^[\\w]+$');
+          if(!re.test(req.body.electionKey)) {
+            return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
+          }
+          if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
+            return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
+          }
+
+        }
+
+      }
+    } else {
       if (req.body.status == 'yes') {
+        return res.status(422).json({errors:[{msg:`Missing student number.`}]});
+      }
+    }
 
-        bcrypt.genSalt(10, (error,salt)=>{
+    // Username search
+    Student.find({ username: req.body.username }, (error,student) => {
+      if (error) next(error)
 
-          if (error) next(error)
+      if (student.length == 0) {
 
-          bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
+        if (req.body.status == 'yes') {
+
+          bcrypt.genSalt(10, (error,salt)=>{
 
             if (error) next(error)
 
-            Student.find({ email: req.body.email }, (error,student)=>{
+            bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
 
               if (error) next(error)
 
-              if (student.length == 0) {
+              Student.find({ email: req.body.email }, (error,student)=>{
 
-                bcrypt.genSalt(10, (err, salt) => {
+                if (error) next(error)
 
-                  if (err) next(err)
+                if (student.length == 0) {
 
-                  bcrypt.hash(req.body.password, salt, (err, passwordHash) => {
+                  bcrypt.genSalt(10, (err, salt) => {
 
                     if (err) next(err)
 
-                    const newStudent = new Student({
-                      username: req.body.username,
-                      firstname: req.body.firstname,
-                      lastname: req.body.lastname,
-                      email: req.body.email,
-                      password: passwordHash,
-                      hash: uuidv4(), //activate hash
-                      studentnumber: req.body.studentnumber,
-                      school: req.body.school,
-                      active: false,
-                      status: true,
-                      registered: new Date(),
-                      delete: new Date(),
-                      key:electionKeyHash
+                    bcrypt.hash(req.body.password, salt, (err, passwordHash) => {
+
+                      if (err) next(err)
+
+                      let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
+                      let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
+                      const newStudent = new Student({
+                        username: req.body.username,
+                        firstname: firstname,
+                        lastname: lastname,
+                        email: req.body.email,
+                        password: passwordHash,
+                        hash: uuidv4(), //activate hash
+                        studentnumber: req.body.studentnumber,
+                        school: req.body.school,
+                        active: false,
+                        status: true,
+                        registered: new Date(),
+                        delete: new Date(),
+                        key:electionKeyHash
+                      });
+
+                      newStudent.save((error,student)=>{
+                        if (error) next(error)
+
+                        if (student) {
+
+                          emailSend(req.body.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
+                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation.`});
+                          }).catch((err) => {
+                            return next(err)
+                          });
+
+
+                        } else {
+                          return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
+                        }
+                      });
+
+
                     });
-
-                    newStudent.save((error,student)=>{
-                      if (error) next(error)
-
-                      if (student) {
-
-                        emailSend(req.body.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                          return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation.`});
-                        }).catch((err) => {
-                          return next(err)
-                        });
-
-
-                      } else {
-                        return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
-                      }
-                    });
-
-
                   });
-                });
 
-              } else {
-                return res.status(422).json({errors:[{msg:"This email is already in use."}]});
-              }
+                } else {
+                  return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+                }
+              });
+
             });
+          })
 
+
+
+
+        } else {
+          // Not actually students but in the same collection.
+          Student.find({ email:req.body.email }, (error,student)=>{
+            if (error) next(error)
+
+            if (student.length == 0) {
+
+              bcrypt.genSalt(10, (err,salt) => {
+                if (err) next(err)
+                bcrypt.hash(req.body.password, salt, (err, hash) => {
+
+                  if (err) next(err)
+
+                  let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
+                  let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
+                  const newMaster = new Student({
+                    username: req.body.username,
+                    firstname: firstname,
+                    lastname: lastname,
+                    email: req.body.email,
+                    password: hash,
+                    school: req.body.school,
+                    status: false,
+                    hash:uuidv4(),
+                    active:false,
+                    registered: new Date(),
+                    delete: new Date()
+                  });
+
+                  newMaster.save((error,master)=>{
+                    if (error) next(error)
+
+                    if (master) {
+
+                      emailSend(req.body.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
+                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation.`});
+                      }).catch(err => next(err));
+
+
+                    } else {
+                      return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
+                    }
+                  });
+
+                });
+              });
+
+            } else {
+              return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+            }
           });
-        })
-
-
-
+        }
 
       } else {
-        // Not actually students but in the same collection.
-        Student.find({ email:req.body.email }, (error,student)=>{
-          if (error) next(error)
-
-          if (student.length == 0) {
-
-            bcrypt.genSalt(10, (err,salt) => {
-              if (err) next(err)
-              bcrypt.hash(req.body.password, salt, (err, hash) => {
-
-                if (err) next(err)
-
-                const newMaster = new Student({
-                  username: req.body.username,
-                  firstname: req.body.firstname,
-                  lastname: req.body.lastname,
-                  email: req.body.email,
-                  password: hash,
-                  school: req.body.school,
-                  status: false,
-                  hash:uuidv4(),
-                  active:false,
-                  registered: new Date(),
-                  delete: new Date()
-                });
-
-                newMaster.save((error,master)=>{
-                  if (error) next(error)
-
-                  if (master) {
-
-                    emailSend(req.body.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                      return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation.`});
-                    }).catch(err => next(err));
-
-
-                  } else {
-                    return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
-                  }
-                });
-
-              });
-            });
-
-          } else {
-            return res.status(422).json({errors:[{msg:"This email is already in use."}]});
-          }
-        });
+        return res.status(422).json({errors:[{msg:"This username already exists. Try another one."}]});
       }
+    });
 
-    } else {
-      return res.status(422).json({errors:[{msg:"This username already exists. Try another one."}]});
-    }
-  });
+  }).catch(()=>{
+    return res.status(400).json({errors:[{msg:'Something wrong.'}]});
+  })
+
 
 });
 
@@ -310,11 +348,12 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
-    select: '-password -__v',
+    select: 'name students elections joined partake',
     populate: {
-      path: 'ongoingElections archived',
-      select: '-tokens -__v',
-      options:{sort:{'date':-1}}
+      path: 'elections',
+      model: 'Election',
+      select: 'type date duration title status electionAccess',
+      options: {sort:{'date':'desc'}}
     }
   }).select('-password -__v -active -key').lean().exec((err,student)=>{
 
@@ -322,20 +361,25 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
     if (student) {
 
+
       student.classrooms_student.forEach((classroom)=>{
         classroom.students.forEach((s)=>{
           delete s['studentnumber'];
         });
-        classroom.ongoingElections.forEach((election)=>{
-          election.voteStatus = election.voteStatus.filter(voterObject => voterObject.studentnumber == student.studentnumber);
-          election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+
+        classroom.elections.forEach((election)=>{
+          if (election.electionAccess) {
+            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+          }
         });
       });
 
+
       student.classrooms_master.forEach((classroom)=>{
-        classroom.ongoingElections.forEach((election)=>{
-          election.voteStatus = election.voteStatus.filter(voterObject => voterObject.studentnumber == student.studentnumber);
-          election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+        classroom.elections.forEach((election)=>{
+          if (election.electionAccess) {
+            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+          }
         });
       });
 
@@ -420,12 +464,10 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
         // deletes all elections associated with master classrooms
         let master_rooms = await Classroom.find({_id:u.classrooms_master}).exec();
         for(let i=0;i<master_rooms.length;i++) {
-          if (master_rooms[i].ongoingElections > 0) {
-            await Election.deleteMany({_id:master_rooms[i].ongoingElections},(err,docs)=>{});
+          if (master_rooms[i].elections > 0) {
+            await Election.deleteMany({_id:master_rooms[i].elections},(err,docs)=>{});
           }
-          if (master_rooms[i].archived > 0) {
-            await Election.deleteMany({_id:master_rooms[i].archived},(err,docs)=>{});
-          }
+
         }
 
         // deletes all master classrooms
@@ -485,49 +527,60 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
     });
   }
 
-  Student.findOne({email:req.body.email}).exec((err,student)=>{
-    if (err) next(err)
-    if (student){
-      const time = new Date().getTime();
 
-      if (student.forgotPassword) {
+  request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
 
-        if (time - student.forgotPasswordTimer > 600000) {
-          student.forgotPassword = uuidv4();
-          student.forgotPasswordTimer = new Date().getTime();
-          student.save().then((student_) => {
+    if (JSON.parse(body).score > 0.3) {
+      Student.findOne({email:req.body.email}).exec((err,student)=>{
+        if (err) next(err)
+        if (student){
+          const time = new Date().getTime();
 
-            resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
-              return res.json({});
-            }).catch((err)=>next(err));
+          if (student.forgotPassword != "") {
+
+            if (time - student.forgotPasswordTimer > 600000) {
+              student.forgotPassword = uuidv4();
+              student.forgotPasswordTimer = new Date().getTime();
+              student.save().then((student_) => {
+
+                resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+                  return res.json({});
+                }).catch((err)=>next(err));
 
 
-          }).catch((err)=>next(err))
+              }).catch((err)=>next(err))
+            } else {
+              // 10 minutes has not passed
+              return res.status(422).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
+            }
+
+          } else {
+            student.forgotPassword = uuidv4();
+            student.forgotPasswordTimer = new Date().getTime();
+            student.save().then((student_) => {
+
+              resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+                return res.json({});
+              }).catch((err)=>next(err));
+
+
+            }).catch((err)=>next(err))
+          }
+
+
+
+
         } else {
-          // 10 minutes has not passed
-          return res.status(422).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
+          return res.status(422).json({ errors: [{msg:'This email is not registered with a user.'}]});
         }
-
-      } else {
-        student.forgotPassword = uuidv4();
-        student.forgotPasswordTimer = new Date().getTime();
-        student.save().then((student_) => {
-
-          resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
-            return res.json({});
-          }).catch((err)=>next(err));
-
-
-        }).catch((err)=>next(err))
-      }
-
-
-
-
+      })
     } else {
-      return res.status(422).json({ errors: [{msg:'This email is not registered with a user.'}]});
+      return res.status(400).json({errors:[{msg:"Something wrong."}]});
     }
-  })
+
+  });
+
+
 
 
 

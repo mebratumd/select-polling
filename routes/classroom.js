@@ -25,6 +25,7 @@ const Student = require('../models/student.js')
 const Election = require('../models/election.js');
 const bcrypt = require('bcrypt');
 const uuidv4 = require('uuid/v4');
+const _ = require('underscore');
 const mongoose = require("mongoose");
 
 const authenticated = (req,res,next) => {
@@ -84,7 +85,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.findOne({name:req.body.name}).populate("ongoingElections").exec((err,room)=>{
+  Classroom.findOne({name:req.body.name}).populate("elections").exec((err,room)=>{
     if (err) next(err)
     if (room) {
       bcrypt.compare(req.body.password,room.password,(err,resp)=>{
@@ -94,12 +95,12 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
             return student.email == req.user.email && student.studentnumber == req.user.studentnumber;
           });
           if (student.length > 0) {
-            if (room.ongoingElections.length > 0) {
+            if (room.elections.length > 0) {
               // token
               // access
               // vote status
               const tkn = uuidv4();
-              room.ongoingElections.forEach(async function(e){
+              room.elections.filter(el => el.status == true).forEach(async function(e){
                 ongoingElec = await Election.findById(e._id).exec();
                 didVote = ongoingElec.voteStatus.filter(voteOb => voteOb.studentnumber == req.user.studentnumber);
                 if (didVote.length == 0) {
@@ -361,7 +362,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
             }
 
-            let currentClassCount = req.body.partake == "true" ? 1 : 0;
+            let currentClassCount = req.body.partake ? 1 : 0;
 
             if (finalClassList.length > 500) {
               throw new Error('Classrooms must be less than 500 students.');
@@ -443,50 +444,58 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
   }
 
 
-  Classroom.findOne({ name:req.body.classname }).exec((err,room)=>{
+  Classroom.findOne({ name:req.body.classname }).populate('elections').exec((err,room)=>{
     if (err) next(err)
 
     try {
       if (room) {
-        if (room.students.length > 4) {
-          if (room.master == req.user.id) {
+        let ongoing = room.elections.filter(el => el.status == true);
 
-            if (req.user.email == req.body.email) {
-              throw new Error('You cannot remove yourself from the classroom.');
-            }
+        if (ongoing.length > 0) {
+          throw new Error('Cannot delete students from class list while elections are underway.');
+        } else {
+          if (room.students.length > 4) {
+            if (room.master == req.user.id) {
 
-            if (req.user.studentnumber == req.body.studentnumber) {
-              throw new Error('You cannot remove yourself from the classroom.');
-            }
-
-            // this should execute regardless of student status
-            Student.findOne({studentnumber:req.body.studentnumber,email:req.body.email}).exec((err,student)=>{
-              if (err) next(err)
-              if (student) {
-                const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
-                student.classrooms_student = newClassList;
-                student.save().then(()=>{
-
-                }).catch((err)=>next(err));
+              if (req.user.email == req.body.email) {
+                throw new Error('You cannot remove yourself from the classroom.');
               }
 
-            });
+              if (req.user.studentnumber == req.body.studentnumber) {
+                throw new Error('You cannot remove yourself from the classroom.');
+              }
 
-            const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
-            room.students = newClassList;
-            const dec = room.joined - 1;
-            room.joined = room.joined == 0 ? 0 : dec;
-            room.save().then(()=>{
-              return res.json({removedStudent:req.body});
-            }).catch((err)=>next(err));
+              // this should execute regardless of student status
+              Student.findOne({studentnumber:req.body.studentnumber,email:req.body.email}).exec((err,student)=>{
+                if (err) next(err)
+                if (student) {
+                  const dec = room.joined - 1;
+                  room.joined = dec;
+                  const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
+                  student.classrooms_student = newClassList;
+                  student.save().then(()=>{
 
+                  }).catch((err)=>next(err));
+                }
+
+              });
+
+              const newClassList = room.students.filter(student => student.studentnumber != req.body.studentnumber && student.email != req.body.email);
+              room.students = newClassList;
+              room.save().then(()=>{
+                return res.json({removedStudent:req.body});
+              }).catch((err)=>next(err));
+
+            } else {
+              throw new Error("You cannot remove students from the classroom.");
+            }
           } else {
-            throw new Error("You cannot remove students from the classroom.");
+            // classroom less than or equal to 4 students
+            throw new Error("Classroom size needs to be more than 4 students.");
           }
-        } else {
-          // classroom less than or equal to 4 students
-          throw new Error("Classroom size needs to be more than 4 students.");
         }
+
+
 
       } else {
         // class not found
@@ -668,6 +677,8 @@ router.post("/ticket",authenticated,[check('title').isLength({min:10,max:150}).w
     return val.trim().replace(/\s\s+/g, ' ')
   }
 }),
+check('typeof').isIn(['stv','fpp','approval']).withMessage('Invalid election type.'),
+check('vacancies').isInt().withMessage('Vacancies must be an integer.'),
 check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.'),
 check('restrictions').custom((resOb) => Object.prototype.toString.call(resOb) == "[object Object]").withMessage('Incorrect format detected.'),
 check('candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
@@ -676,7 +687,7 @@ check('description').isLength({min:20,max:500}).withMessage("Description must be
     return val.trim().replace(/\s\s+/g, ' ')
   }
 }),
-check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
+check('duration').custom((time) => time >= 0 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
 
 
   const errors = validationResult(req);
@@ -693,6 +704,10 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
+  if (req.body.vacancies >= Object.keys(candidates).length) {
+    return res.status(422).json({ errors: [{msg:'The number of candidates must be greater than the number of vacancies.'}] });
+  }
+
   const restrictedStudentIds = Object.keys(req.body.restrictions);
   let restrictedCandidates = {};
   restrictedStudentIds.forEach((id)=>{
@@ -701,8 +716,9 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
+  let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
 
-  return res.json({election:{candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls}});
+  return res.json({election:ticketBody});
 
 
 
@@ -722,7 +738,9 @@ check('sheet.*.description').isLength({min:20,max:500}).withMessage("All descrip
     return val.trim().replace(/\s\s+/g, ' ')
   }
 }),
-check('sheet.*.duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
+check('sheet.*.vacancies').matches(/^\d+$/).withMessage('Vacancies must be an integer.'),
+check('sheet.*.type').isIn(['stv','fpp','approval']).withMessage('Not a valid election type.'),
+check('sheet.*.duration').custom((time) => time >= 0 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
 check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
   if (val) {
     return val.toLowerCase()
@@ -738,85 +756,119 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
     let allCandidates = [];
     let trueCandidates;
 
-    Classroom.findOne({ name:req.body.classname }).exec((error,classroom)=>{
+    Classroom.findOne({ name:req.body.classname }).populate({
+      path: 'elections',
+      model: 'Election',
+      options: {sort:{'date':'asc'}}
+    }).exec((error,classroom)=>{
       if (error) next(error)
-      if (classroom) {
-        if (classroom.master == req.user.id) {
+      try {
+        if (classroom) {
+          if (classroom.master == req.user.id) {
 
-          const tokens = classroom.students.map((student)=>{
-            return {studentnumber:student.studentnumber,hash:uuidv4()}
-          });
-
-          sheet.forEach((poll,idx) => {
-
-            const restrictedStudentIds = Object.keys(poll.restrictions);
-            let restrictedCandidates = [];
-            const re = new RegExp('^[\\d]{5,10}$');
-            restrictedStudentIds.forEach((id)=>{
-              if (!re.test(id)) {
-                return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
-              }
-              if (poll.restrictions[id] == true) {
-                restrictedCandidates.push(id);
-              } else if (poll.restrictions[id] == false) {
-                // ignore
-              } else {
-                return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
-              }
+            const tokens = classroom.students.map((student)=>{
+              return {studentnumber:student.studentnumber,hash:uuidv4()}
             });
 
-            let voterStat = classroom.students.map((student)=>{
-              if (restrictedCandidates.indexOf(student.studentnumber.toString()) == -1) {
-                return {studentnumber:student.studentnumber,didVote:false};
-              } else {
-                return {studentnumber:student.studentnumber,didVote:true};
-              }
-            }); //
+            sheet.forEach((poll,idx) => {
 
-            const classStudentIds = classroom.students.map(student => student.studentnumber);
-            trueCandidates = Object.keys(poll.candidates).filter(candidate => poll.candidates[candidate] == true);
-            trueCandidates.forEach((candidate)=>{
-              if (!classStudentIds.includes(candidate)) {
-                return res.status(422).json({errors:[{msg:'Candidates must be a student in the class list.'}]});
+              const restrictedStudentIds = Object.keys(poll.restrictions);
+              let restrictedCandidates = [];
+              const re = new RegExp('^[\\d]{5,10}$');
+              restrictedStudentIds.forEach((id)=>{
+                if (!re.test(id)) {
+                  throw new Error('Invalid format for election restrictions.');
+                  //return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
+                }
+                if (poll.restrictions[id] == true) {
+                  restrictedCandidates.push(id);
+                } else if (poll.restrictions[id] == false) {
+                  // ignore
+                } else {
+                  throw new Error('Invalid format for election restrictions.');
+                  //return res.status(422).json({errors:[{msg:'Invalid format for election restrictions.'}]});
+                }
+              });
+
+              let voterStat = classroom.students.map((student)=>{
+                if (restrictedCandidates.indexOf(student.studentnumber.toString()) == -1) {
+                  return {studentnumber:student.studentnumber,didVote:false};
+                } else {
+                  return {studentnumber:student.studentnumber,didVote:true};
+                }
+              });
+
+              const classStudentIds = classroom.students.map(student => student.studentnumber);
+              trueCandidates = Object.keys(poll.candidates).filter(candidate => poll.candidates[candidate] == true);
+              trueCandidates.forEach((candidate)=>{
+                if (!classStudentIds.includes(candidate)) {
+                  throw new Error('Candidates must be a student in the class list.');
+                  //return res.status(422).json({errors:[{msg:'Candidates must be a student in the class list.'}]});
+                }
+              });
+
+              poll.candidates = classroom.students.filter((student) => {
+                return trueCandidates.indexOf(student.studentnumber.toString()) > -1
+              });
+
+
+              poll.date = new Date();
+              poll.class = classroom.id;
+              poll.status = true;
+              if (poll.type == "fpp" || poll.type == "approval") {
+                poll.count = poll.candidates.map((ob) => { return { studentnumber:ob.studentnumber,votes:0,_id:ob._id,name:ob.name } });
               }
+
+              if (poll.type == "stv") {
+                poll.count_STV = poll.candidates.map((ob) => { return { studentnumber:ob.studentnumber,_id:ob._id,name:ob.name,ranks:[] } });
+              }
+
+              poll.electionAccess = classroom.students.map((student) => { return {studentnumber:student.studentnumber,permission:false} });
+              poll.voteStatus = voterStat;
+              poll.tokens = tokens;
+              if (poll.urls != undefined) {
+                poll.links = poll.urls;
+              }
+
+              if (poll.candidates.length <= poll.vacancies) {
+                // error
+                throw new Error('The number of candidates must exceed the number of vacancies.');
+                //return res.status(422).json({errors:[{msg:'The number of candidates must exceed the number of vacancies.'}]});
+
+              }
+
+
             });
 
-            poll.candidates = classroom.students.filter((student) => {
-              return trueCandidates.indexOf(student.studentnumber.toString()) > -1
+
+            Election.insertMany(sheet).then((docs) => {
+              if (classroom.elections.length > 100) {
+                let remove = sheet.length + (classroom.elections.length - 100);
+                classroom.elections.splice(0,remove);
+              }
+              let ids = docs.map(e => e._id).forEach((id)=>{
+                classroom.elections.push(id);
+              });
+              classroom.save().then(()=>{
+                return res.json({});
+              }).catch(err=>next(err));
+            },(err)=>{
+              return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
             });
 
-            poll.date = new Date();
-            poll.class = classroom.id;
-            poll.status = true;
-            poll.count = trueCandidates.map((id) => { return {studentnumber:id,count:0}});
-            poll.electionAccess = classroom.students.map((student) => { return {studentnumber:student.studentnumber,permission:false} });
-            poll.voteStatus = voterStat;
-            poll.tokens = tokens;
-            if (poll.urls != undefined) {
-              poll.links = poll.urls;
-            }
+          } else {
+            return res.status(422).json({errors:[{msg:'You do not have permission to create polls for this class.'}]});
+          }
 
 
-          });
-
-          Election.insertMany(sheet).then((docs) => {
-            classroom.ongoingElections = docs;
-            classroom.save().then(()=>{
-              return res.json({});
-            }).catch(err=>next(err));
-          },(err)=>{
-            return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
-          });
 
         } else {
-          return res.status(422).json({errors:[{msg:'You do not have permission to create polls for this class.'}]})
+          return res.status(422).json({errors:[{msg:"Classroom does not exist."}]});
         }
-
-
-
-      } else {
-        return res.status(422).json({errors:[{msg:"Classroom does not exist."}]});
+      } catch(e) {
+        return res.status(422).json({errors:[{msg:e.message}]});
       }
+
     })
 
 });
@@ -834,7 +886,7 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
   }
 
   if (req.params.key === "code") {
-    Classroom.findOne({ name:req.body.name }).populate('ongoingElections').exec((err,classroom) => {
+    Classroom.findOne({ name:req.body.name }).populate('elections').exec((err,classroom) => {
         if (err) next(err)
 
         try {
@@ -842,9 +894,9 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
             const studentIds = classroom.students.map(student => student.studentnumber);
             if (studentIds.includes(req.user.studentnumber)) {
 
-              if (classroom.ongoingElections.length > 0) {
+              if (classroom.elections.length > 0) {
 
-                const firstElection = classroom.ongoingElections[0];
+                const firstElection = classroom.elections.filter(el => el.status == true)[0];
                 const pass = firstElection.tokens.find((student) => {
                   return student.studentnumber == req.user.studentnumber && student.hash == req.body.password;
                 });
@@ -898,12 +950,12 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
     bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
       if (error) next(error)
       if (response) {
-        Classroom.find({name:req.body.name}).populate('ongoingElections').exec((err,room)=>{
+        Classroom.find({name:req.body.name}).populate('elections').exec((err,room)=>{
           if (err) next(err)
           if (room.length > 0) {
             let valid = room[0].students.filter(student => student.studentnumber == req.user.studentnumber);
             if (valid.length > 0) {
-              let firstElection = room[0].ongoingElections[0];
+              let firstElection = room[0].elections.filter(el => el.status == true)[0];
               let token = firstElection.tokens.filter(token => token.studentnumber == req.user.studentnumber)[0];
               if (token) {
                 return res.json({key:token.hash});
@@ -929,84 +981,150 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
 
 });
 
-router.post("/vote",authenticated,(req,res,next)=>{
+router.post("/vote",[check('type').isIn(['stv','fpp','approval']).withMessage('Invalid election type.')],authenticated,(req,res,next)=>{
+
+  if (req.body.type == "stv") {
+    if (Object.prototype.toString.call(req.body.student) != "[object Array]") {
+      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+    }
+    if (req.body.students.length <= 0) {
+      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+    }
+  }
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ errors: errors.array() });
+  }
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
     populate: {
-      path: 'ongoingElections',
+      path: 'elections',
     }
   }).exec((err,student)=>{
     if (err) next(err)
     try {
       const foundElectionMaster = student.classrooms_master.filter((room)=>{
-        return room.ongoingElections.some(e => e._id == req.body.id );
+        return room.elections.some(e => e._id == req.body.id );
       });
 
       const foundElectionStudent = student.classrooms_student.filter((room)=>{
-        return room.ongoingElections.some(e => e._id == req.body.id );
+        return room.elections.some(e => e._id == req.body.id );
       });
 
       if (foundElectionMaster.length > 0 || foundElectionStudent.length > 0) {
         Election.findById(req.body.id).exec((err,elec) => {
           if (err) next(err)
-          const start = new Date(elec.date).getTime();
-          const duration = elec.duration*3600000;
-          const expiration = start + duration;
-          const current = new Date().getTime();
-          const expired = current < expiration ? false : true;
-          if (expired && elec.status) {
-            elec.status = false;
-            elec.voteStatus = [];
-            elec.electionAccess = []
-            elec.save().then((updateElec) => {
-              Classroom.findById(updatedElec.class).populate('ongoingElections').exec((err,room)=>{
-                if (err) next(err)
-                const idx = room.ongoingElections.findIndex(e => e._id == req.body.id);
-                room.ongoingElections.splice(idx,1);
-                room.archived.push(updatedElec);
-                room.save().catch((err) => next(err));
-              });
+          try {
+            const start = new Date(elec.date).getTime();
+            const duration = elec.duration*3600000;
+            const expiration = start + duration;
+            const current = new Date().getTime();
+            const expired = current < expiration ? false : true;
+            if (expired) {
+              throw new Error('Cannot submit vote as the poll is now closed.');
+            } else {
+              const studentStatus = elec.voteStatus.filter(student => student.studentnumber == req.user.studentnumber)[0];
+              if (!studentStatus.didVote) {
+                if (req.body.type == "fpp") {
+                  const candidatePresent = elec.candidates.find(candidate => candidate._id == req.body.student._id);
+                  if (candidatePresent) {
+                    elec.count.forEach((student)=>{
+                      if (student._id == req.body.student._id) {
+                        student.votes = student.votes + 1;
+                      }
+                    });
+
+                    elec.total = elec.total+1;
+
+                    elec.voteStatus.forEach((ob)=>{
+                      if (ob.studentnumber == req.user.studentnumber) {
+                        ob.didVote = true;
+                      }
+                    });
+                    elec.save().then(()=>{
+                      return res.json({}) //success
+                    }).catch((err)=>next(err));
 
 
-            }).catch((err) => next(err));
+                  } else {
+                    // candidate is not legit
+                    throw new Error('Vote note submitted: candidate not found.');
+                  }
+                }
 
-            throw new Error('Cannot submit vote as the poll is now closed.');
-          } else {
-            const studentStatus = elec.voteStatus.filter(student => student.studentnumber == req.user.studentnumber)[0];
-            if (!studentStatus.didVote) {
-              const candidatePresent = elec.candidates.find(candidate => candidate.studentnumber == req.body.student.studentnumber);
-              if (candidatePresent) {
-                elec.count.forEach((student)=>{
-                  if (student.studentnumber == req.body.student.studentnumber) {
-                    if (student.votes) {
-                      student.votes = student.votes + 1;
-                    } else {
-                      student.votes = 1;
+                if (req.body.type == "stv") {
+                  let studentIdsAllCand = elec.candidates.map(cand => cand._id);
+                  req.body.student.forEach((id)=>{
+                    if (studentIdsAllCand.indexOf(id) == -1) {
+                      throw new Error("Candidate does not exist.");
                     }
+                  });
 
-                  }
-                });
-                elec.voteStatus.forEach((ob)=>{
-                  if (ob.studentnumber == req.user.studentnumber) {
-                    ob.didVote = true;
-                  }
-                });
-                elec.save().then(()=>{
-                  return res.json({}) //success
-                }).catch((err)=>next(err));
+                  let firstChoice = req.body.student[0];
+                  elec.count_STV.forEach((ob)=>{
+                    if (ob._id == firstChoice) {
+                      ob.ranks.push(req.body.student);
+                      ob.total = ob.total + 1;
+                    }
+                  });
+
+                  elec.total = elec.total + 1;
+
+                  elec.quota = (elec.total/(elec.vacancies + 1)) + 1;
+
+                  elec.voteStatus.forEach((ob)=>{
+                    if (ob.studentnumber == req.user.studentnumber) {
+                      ob.didVote = true;
+                    }
+                  });
+
+                  elec.save().then(()=>{
+                    return res.json({}) //success
+                  }).catch((err)=>next(err));
+
+
+                }
+
+                if (req.body.type == "approval") {
+                  let studentIdsAllCand = elec.candidates.map(cand => cand._id);
+                  Object.keys(req.body.student).forEach((id)=>{
+                    if (studentIdsAllCand.indexOf(id) == -1) {
+                      throw new Error("Candidate does not exist.");
+                    }
+                  });
+
+                  elec.count.forEach((ob)=>{
+                    if (req.body.student[ob._id] === true) {
+                      ob.votes = ob.votes + 1;
+                    }
+                  });
+
+                  elec.total = elec.candidates.length + elec.total;
+
+                  elec.voteStatus.forEach((ob)=>{
+                    if (ob.studentnumber == req.user.studentnumber) {
+                      ob.didVote = true;
+                    }
+                  });
+                  elec.save().then(()=>{
+                    return res.json({}) //success
+                  }).catch((err)=>next(err));
+
+                }
+
+
 
               } else {
-                // candidate is not legit
-                throw new Error('Vote note submitted: candidate not found.');
+                // already voted
+                throw new Error('You either do not have permission to vote or have already submitted a vote.');
               }
-
-
-            } else {
-              // already voted
-              throw new Error('You either do not have permission to vote or have already submitted a vote.');
             }
+          } catch(e){
+            return res.status(422).json({ errors: [{msg:e.message}] });
           }
+
 
 
         });
@@ -1030,45 +1148,192 @@ router.post("/vote",authenticated,(req,res,next)=>{
 
 router.post("/expired",authenticated,(req,res,next) => {
 
-  edits = async (ids) =>{
-    for(let i=0;i<ids.length;i++) {
-      let expiredElec = await Election.findById(ids[i]).exec();
-      if (expiredElec) {
-        const start = new Date(expiredElec.date).getTime();
-        const duration = expiredElec.duration * 3600000;
-        const expiration = start + duration;
-        const current = new Date().getTime();
-        const expired = current < expiration ? false : true;
-        if (expired && expiredElec.status) {
-          expiredElec.status = false;
-          let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'ongoingElections archived',options:{sort:{'date':1}}}).exec();
-          const idx = expiredElecClass.ongoingElections.findIndex(e => e._id == ids[i]);
-          if (idx > -1) {
-            expiredElec.electionAccess = undefined;
-            expiredElec.voteStatus = undefined;
-            let savedExpiredElec = await expiredElec.save();
-            let filteredPoll = await Election.findById(ids[i]).exec();
-            expiredElecClass.ongoingElections.splice(idx,1);
-            if (expiredElecClass.archived.length < 100) {
-              expiredElecClass.archived.push(filteredPoll);
-            } else {
-              expiredElecClass.archived.splice(0,1,filteredPoll);
-            }
 
-            let savedExpiredElecClass = await expiredElecClass.save();
+  edits = async (ids) =>{
+
+      for(let i=0;i<ids.length;i++) {
+        let expiredElec = await Election.findById(ids[i]).exec();
+        let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
+        if (expiredElecClass.master == req.user.id) {
+
+          if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
+            const start = new Date(expiredElec.date).getTime();
+            const duration = expiredElec.duration * 3600000;
+            const expiration = start + duration;
+            const current = new Date().getTime();
+            const expired = current < expiration ? false : true;
+            if (expired && expiredElec.status) {
+              expiredElec.status = false;
+              expiredElec.electionAccess = undefined;
+              expiredElec.voteStatus = undefined;
+              await expiredElec.save();
+            } else {
+              throw new Error();
+            }
+          } else if (expiredElec.type == "stv") {
+            let expiredElec_ = await Election.findById(ids[i]).exec();
+            expiredElec_.count_STV.sort((a,b)=>{
+              return b.total - a.total;
+            });
+            const start = new Date(expiredElec_.date).getTime();
+            const duration = expiredElec_.duration * 3600000;
+            const expiration = start + duration;
+            const current = new Date().getTime();
+            const expired = current < expiration ? false : true;
+            if (expired && expiredElec_.status) {
+              let exceededThreshold = [];
+              let eliminated = [];
+              let elected = [];
+              let roundedQuota = Math.floor(expiredElec_.quota);
+              expiredElec_.count_STV.forEach((student)=>{
+                if (student.ranks.length >= roundedQuota) {
+                  exceededThreshold.push(student.studentnumber);
+                  elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
+                  let excessVotes = _.sample(student.ranks,student.ranks.length - roundedQuota);
+                  excessVotes.forEach((excess)=>{
+                    excess.shift();
+                    let followingRanked = excess[0];
+                    expiredElec_.count_STV.forEach((candidate) => {
+                      if (candidate._id == followingRanked) {
+                        candidate.ranks.push(excess);
+                      }
+                    })
+                  });
+                }
+              });
+
+              await expiredElec_.save();
+              // not enough votes
+              let expiredElec__ = await Election.findById(ids[i]).exec();
+              if (elected.length < expiredElec_.vacancies) {
+                expiredElec__.count_STV.sort((a,b)=>{
+                  return a.total - b.total;
+                });
+                try {
+
+                  expiredElec__.count_STV.forEach((student,index)=>{
+
+                    if (exceededThreshold.indexOf(student.studentnumber) == -1 && index+1 <= expiredElec__.candidates.length - expiredElec__.vacancies) {
+
+                      eliminated.push(student.studentnumber);
+
+                      student.ranks.forEach((voteList)=>{
+                        voteList.shift();
+                        for(let i=0;i<voteList.length;i++){
+                          try {
+                            expiredElec__.count_STV.forEach((candidate)=>{
+                              if (candidate._id == voteList[i] && exceededThreshold.indexOf(voteList[i]) == -1 && eliminated.indexOf(voteList[i]) == -1) {
+                                candidate.ranks.push(voteList);
+                                throw new Error();
+                              }
+                            })
+                          } catch(e) {
+                            break;
+                          }
+
+                        }
+
+                      });
+                      // see if anyone hit quota
+                      expiredElec__.count_STV.forEach((student_)=>{
+                          if (student_.ranks.length >= roundedQuota && exceededThreshold.indexOf(student_.studentnumber) == -1) {
+                            elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student_._id});
+                            exceededThreshold.push(student.studentnumber);
+                          }
+                      });
+
+                      // check to see if there are remaining vacancies
+
+                      if (elected.length >= expiredElec__.vacancies) {
+                        throw new Error();
+                      }
+
+                    } else {
+                      elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
+                      exceededThreshold.push(student.studentnumber);
+                      throw new Error();
+                    }
+
+
+
+
+                  });
+
+                } catch(e) {
+                  // done
+                  let losers = [];
+                  expiredElec__.candidates.forEach((can)=>{
+                    if (exceededThreshold.indexOf(can.studentnumber) == -1) {
+                      losers.push({studentnumber:can.studentnumber,quota:0,_id:can._id});
+                    };
+                  });
+                  let elected_all = elected.concat(losers);
+                  elected_all.forEach((ob)=>{
+                    expiredElecClass.students.forEach((student)=>{
+                      if (student.studentnumber == ob.studentnumber) {
+                        ob['name'] = student.name;
+                      }
+                    })
+                  });
+
+                  expiredElec__.status = false;
+                  expiredElec__.elected_STV = elected_all;
+                  expiredElec__.electionAccess = undefined;
+                  expiredElec__.voteStatus = undefined;
+                  await expiredElec__.save();
+
+                }
+
+              } else {
+                // done
+                let losers = [];
+                expiredElec__.candidates.forEach((can)=>{
+                  if (exceededThreshold.indexOf(can.studetnumber) == -1) {
+                    losers.push({studentnumber:can.studentnumber,quota:0,_id:can._id});
+                  };
+                });
+                let elected_all = elected.concat(losers);
+                elected_all.forEach((ob)=>{
+                  expiredElecClass.students.forEach((student)=>{
+                    if (student.studentnumber == ob.studentnumber) {
+                      ob['name'] = student.name;
+                    }
+                  })
+                })
+                expiredElec__.status = false;
+                expiredElec__.elected_STV = elected_all;
+                expiredElec__.electionAccess = undefined;
+                expiredElec__.voteStatus = undefined;
+                await expiredElec__.save();
+
+              }
+
+            } else {
+              // poll has already been closed and expired
+              throw new Error();
+            }
           } else {
+            // neither stv or fpp
             throw new Error();
           }
+
         } else {
+          // do not have permission to expire elections
           throw new Error();
         }
-      } else {
-        throw new Error();
+
       }
-    }
+
+
+
+
+
+
   }
 
-  edits(req.body.ids).catch((err)=>{
+  edits(req.body.ids).then(()=>{
+    return res.json({});
+  }).catch((err)=>{
     next(err)
   });
 
@@ -1079,7 +1344,7 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
 
 
       Classroom.findOne({name:req.body.name}).populate({
-        path:'ongoingElections',
+        path:'elections',
         populate: {
           path: 'candidates'
         }
@@ -1093,10 +1358,9 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
               if (poll.status) {
                 bcrypt.compare(req.body.password,room.password,(e,r)=>{
                   if (e) next(e)
-
                   if (r) {
-                    let updatedElections = room.ongoingElections.filter(elections => elections._id != req.body.id);
-                    room.ongoingElections = updatedElections;
+                    let updatedElections = room.elections.filter(elections => elections._id != req.body.id);
+                    room.elections = updatedElections;
                     room.save().then(()=>{
                       Election.deleteOne({_id:req.body.id},(err,result)=>{
                         if (err) next(err)
@@ -1166,13 +1430,8 @@ check('password').isLength({min:4,max:12}).withMessage("Password must be between
 
 
                 // deletes all elections associated with master classrooms
-                if (room.ongoingElections.length >0) {
-                  Election.deleteMany({id:room.ongoingElections},(err,docs)=>{
-                    if (err) next(err)
-                  });
-                }
-                if (room.archived.length > 0) {
-                  Election.deleteMany({id:room.archived},(err,docs)=>{
+                if (room.elections >0) {
+                  Election.deleteMany({id:room.elections},(err,docs)=>{
                     if (err) next(err)
                   });
                 }
@@ -1239,5 +1498,74 @@ check('password').isLength({min:4,max:12}).withMessage("Password must be between
   });
 
 });
+
+router.get("/permission/:id",(req,res,next)=>{
+  if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+
+      Election.findOne({_id: req.params.id}).populate({
+        path: 'class',
+        select: 'students _id'
+      }).select('-tokens -count.studentnumber -candidates.studentnumber -elected_STV.studentnumber -count_STV.studentnumber').lean().exec((err,election)=>{
+
+        if (err) {
+          next(err)
+        }
+
+        if (election) {
+          if (election.status) {
+            election.electionAccess.forEach((student,idx)=>{
+              if (student.studentnumber == req.user.studentnumber) {
+                if (student.permission) {
+
+                  if (election.voteStatus) {
+                    election.voteStatus = election.voteStatus.filter(voterObject => voterObject.studentnumber == student.studentnumber);
+                  }
+
+                  if (election.electionAccess) {
+                    election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+                  }
+
+                  let classSize = election.class.students.length;
+                  delete election.class['students'];
+
+                  return res.json({election:election,classSize:classSize});
+                } else {
+                  return res.status(401).send('Must enter your election key before proceeding to poll.');
+                }
+              }
+              if (idx+1 == election.electionAccess.length) {
+                return res.status(401).send('Unauthorized.');
+              }
+            });
+          } else {
+            let students = election.class.students.map(student => student.studentnumber);
+            if (students.indexOf(req.user.studentnumber) > -1) {
+              delete election['class'];
+              return res.json({election:election});
+            } else {
+              if (election.class.master == req.user.id) {
+                delete election['class'];
+                return res.json({election:election});
+              } else {
+                return res.status(401).send();
+              }
+            }
+          }
+
+
+        } else {
+          // doesn't exist
+          return res.status(404).send('Poll does not exist.');
+        }
+
+      })
+
+  } else {
+    return res.status(401).send();
+  }
+
+
+});
+
 
 module.exports = router;

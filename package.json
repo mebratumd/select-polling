@@ -26,7 +26,9 @@
     "passport": "^0.4.0",
     "passport-local": "^1.0.0",
     "path": "^0.12.7",
+    "request": "^2.88.2",
     "socket.io": "^2.2.0",
+    "underscore": "^1.10.2",
     "uuid": "^3.3.2"
   },
   "description": "",

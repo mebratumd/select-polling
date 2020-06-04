@@ -13,10 +13,6 @@ const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
-const cors = require("cors");
-
-//require('dotenv').config();
-
 
 
 const app = express();
@@ -41,7 +37,6 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-
 app.use(sslRedirect());
 app.use((req,res,next)=>{
   if (!req.headers.host.match(/^www\./)) {
@@ -51,8 +46,8 @@ app.use((req,res,next)=>{
   }
 })
 
-app.use(express.static(path.join(__dirname,'public')));
 
+app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
   secret: 'konjo habesha',
   resave: false,
@@ -72,14 +67,14 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.set('trust proxy', true); //
 
-
-app.use("/",auth);
+app.use("/", auth);
 app.use("/class",classroom);
 
 // DB failures
 app.use((error,req,res,next)=>{
-  console.log(error);
-  res.status(500).json({errors:[{msg:'Something went wrong.'}]});
+  if (error) {
+    res.status(500).json({errors:[{msg:'Something went wrong.'}]});
+  }
 });
 
 app.use("/",classLimiter); //
@@ -87,26 +82,26 @@ app.use("/",classLimiter); //
 // update polls
 io.of("/update").on("connection",(socket)=>{
 
-  socket.on("check",(classID)=>{
-    Classroom.findById(classID).populate({
-      path: 'ongoingElections',
-      options:{sort:{'date':-1}}
-    }).exec((err,classroom)=>{
+  socket.on("check",(electionID)=>{
+    Election.findById({"_id":electionID}).populate({
+      path:'class',
+      select: 'name'
+    }).select('-tokens -electionAccess -voteStatus -count.studentnumber -candidates.studentnumber').lean().exec((err,election)=>{
       if (err) throw err
-      if (classroom) {
-        io.of("/update").in(socket.rooms[classroom.name]).emit("updatedCount",{updatedElections:classroom.ongoingElections,name:classroom.name});
+      if (election) {
+        io.of("/update").in(socket.rooms[election._id]).emit("updatedCount",{updatedElection:election});
       }
 
     });
 
   });
 
-  socket.on("joinClassroom",(classroomID)=>{
-    Classroom.findById(classroomID).exec((error,classroom)=>{
+  socket.on("joinElectionRoom",(electionID)=>{
+    Election.findById(electionID).exec((error,election)=>{
       if (error) throw error
-      if (classroom) {
-        socket.join(classroom.name, ()=>{
-          //console.log(Object.keys(socket.rooms));
+      if (election) {
+        socket.join(election._id, ()=>{
+
         });
       }
     });

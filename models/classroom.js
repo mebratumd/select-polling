@@ -8,8 +8,7 @@ const classroomSchema = new mongoose.Schema({
   partake: Boolean,
   school: String,
   registered: Date,
-  ongoingElections: [{type:mongoose.Schema.Types.ObjectId, ref:'Election'}],
-  archived: [{type:mongoose.Schema.Types.ObjectId, ref:'Election'}],
+  elections: [{type:mongoose.Schema.Types.ObjectId, ref:'Election'}],
   master: {type:mongoose.Schema.Types.ObjectId, ref:'Student'},
   students: [{email:String, studentnumber:Number, name:String}],
   joined:Number

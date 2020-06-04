@@ -3,13 +3,19 @@ require('./student.js');
 require('./classroom.js');
 
 const electionSchema = new mongoose.Schema({
+  type:String,
   title: String,
   class:{type: mongoose.Schema.Types.ObjectId,ref:'Classroom'},
   duration: Number,
   date: Date,
   status: Boolean,
-  count: [{studentnumber:Number,votes:Number}],
+  vacancies: Number,
+  quota: Number,
+  count: [{studentnumber:Number,votes:Number,name:String}],
+  count_STV: [{studentnumber:Number,ranks:[[String]],total:{type:Number,default:0},name:String}],
+  total: {type:Number,default:0},
   candidates: [{studentnumber:Number,name:String}],
+  elected_STV: [{studentnumber:Number,quota:Number,name:String}],
   tokens: [{studentnumber:Number,hash:String}],
   links: [String],
   electionAccess: [{studentnumber:Number,permission:Boolean}],
