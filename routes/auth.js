@@ -191,11 +191,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
                 if (student.length == 0) {
 
-                  bcrypt.genSalt(10, (err, salt) => {
+                  bcrypt.genSalt(10, (err, salt_) => {
 
                     if (err) next(err)
 
-                    bcrypt.hash(req.body.password, salt, (err, passwordHash) => {
+                    bcrypt.hash(req.body.password, salt_, (err, passwordHash) => {
 
                       if (err) next(err)
 
