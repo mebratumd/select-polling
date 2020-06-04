@@ -536,7 +536,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
         if (student){
           const time = new Date().getTime();
 
-          if (student.forgotPassword != "") {
+          if (student.forgotPassword) {
 
             if (time - student.forgotPasswordTimer > 600000) {
               student.forgotPassword = uuidv4();
