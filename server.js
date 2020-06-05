@@ -73,6 +73,7 @@ app.use("/class",classroom);
 // DB failures
 app.use((error,req,res,next)=>{
   if (error) {
+    console.log(error);
     res.status(500).json({errors:[{msg:'Something went wrong.'}]});
   }
 });
