@@ -14,6 +14,7 @@ const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
 
+//require('dotenv').config();
 
 const app = express();
 const server = require('http').Server(app);
@@ -73,7 +74,6 @@ app.use("/class",classroom);
 // DB failures
 app.use((error,req,res,next)=>{
   if (error) {
-    console.log(error);
     res.status(500).json({errors:[{msg:'Something went wrong.'}]});
   }
 });
