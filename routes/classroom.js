@@ -1198,7 +1198,8 @@ router.post("/expired",authenticated,(req,res,next) => {
                 if (student.ranks.length >= roundedQuota) {
                   exceededThreshold.push(student.studentnumber);
                   elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
-                  let excessVotes = _.sample(student.ranks,student.ranks.length - roundedQuota);
+                  let slice = student.ranks.length - roundedQuota
+                  let excessVotes = _.sample(student.ranks,slice);
                   excessVotes.forEach((excess)=>{
                     excess.shift();
                     let followingRanked = excess[0];
@@ -1214,13 +1215,13 @@ router.post("/expired",authenticated,(req,res,next) => {
               await expiredElec_.save();
               // not enough votes
               let expiredElec__ = await Election.findById(ids[i]).exec();
-              if (elected.length < expiredElec_.vacancies) {
-                expiredElec__.count_STV.sort((a,b)=>{
-                  return a.total - b.total;
-                });
+              if (elected.length < expiredElec__.vacancies) {
+
                 try {
 
-                  expiredElec__.count_STV.forEach((student,index)=>{
+                  expiredElec__.count_STV.sort((a,b)=>{
+                    return a.total - b.total;
+                  }).forEach((student,index)=>{
 
                     if (exceededThreshold.indexOf(student.studentnumber) == -1 && index+1 <= expiredElec__.candidates.length - expiredElec__.vacancies) {
 
