@@ -1196,7 +1196,7 @@ router.post("/expired",authenticated,(req,res,next) => {
               let roundedQuota = Math.floor(expiredElec_.quota);
 
               expiredElec_.count_STV.forEach((student)=>{
-                if (student.ranks.length >= roundedQuota) {
+                if (student.ranks.length > roundedQuota) {
                   exceededThreshold.push(student.studentnumber);
                   elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
                 }
@@ -1229,7 +1229,7 @@ router.post("/expired",authenticated,(req,res,next) => {
                 exceededThreshold = [];
 
                 expiredElec_.count_STV.forEach((student)=>{
-                  if (student.ranks.length >= roundedQuota) {
+                  if (student.ranks.length > roundedQuota) {
                     exceededThreshold.push(student.studentnumber);
                     elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
                     let slice = student.ranks.length - roundedQuota
@@ -1280,7 +1280,7 @@ router.post("/expired",authenticated,(req,res,next) => {
                         });
                         // see if anyone hit quota
                         expiredElec__.count_STV.forEach((student_)=>{
-                            if (student_.ranks.length >= roundedQuota && exceededThreshold.indexOf(student_.studentnumber) == -1) {
+                            if (student_.ranks.length > roundedQuota && exceededThreshold.indexOf(student_.studentnumber) == -1) {
                               elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student_._id});
                               exceededThreshold.push(student.studentnumber);
                             }
