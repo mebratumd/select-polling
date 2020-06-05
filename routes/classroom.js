@@ -1259,11 +1259,13 @@ router.post("/expired",authenticated,(req,res,next) => {
                       }
 
                     } else {
-                      elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
-                      exceededThreshold.push(student.studentnumber);
+                      if (exceededThreshold.indexOf(student.studentnumber) == -1) {
+                        elected.push({studentnumber:student.studentnumber,quota:roundedQuota,_id:student._id});
+                        exceededThreshold.push(student.studentnumber);
+                      }
                       if (index+1 == expiredElec__.candidates.length) {
                         throw new Error();
-                      }  
+                      }
                     }
 
 
