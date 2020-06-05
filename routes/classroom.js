@@ -996,7 +996,7 @@ router.post("/vote",[check('type').isIn(['stv','fpp','approval']).withMessage('I
     if (Object.prototype.toString.call(req.body.student) != "[object Array]") {
       return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
     }
-    if (req.body.students.length <= 0) {
+    if (req.body.student.length <= 0) {
       return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
     }
   }

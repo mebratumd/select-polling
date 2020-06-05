@@ -10,7 +10,7 @@ const electionSchema = new mongoose.Schema({
   date: Date,
   status: Boolean,
   vacancies: Number,
-  quota: Number,
+  quota: {type: Number,default:0},
   count: [{studentnumber:Number,votes:Number,name:String}],
   count_STV: [{studentnumber:Number,ranks:[[String]],total:{type:Number,default:0},name:String}],
   total: {type:Number,default:0},
