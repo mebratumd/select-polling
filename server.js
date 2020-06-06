@@ -13,12 +13,17 @@ const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
+const { AppServerModuleNgFactory, ngExpressEngine } = require('./public/server/main.js');
 
 //require('dotenv').config();
 
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
+
+app.engine('html',ngExpressEngine({bootstrap:AppServerModuleNgFactory}))
+app.set('view engine','html');
+app.set('views',express.static(path.join(__dirname,'public/browser')))
 
 const classLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -38,6 +43,7 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
+
 app.use(sslRedirect());
 app.use((req,res,next)=>{
   if (!req.headers.host.match(/^www\./)) {
@@ -48,7 +54,7 @@ app.use((req,res,next)=>{
 })
 
 
-app.use(express.static(path.join(__dirname,'public')));
+//app.use(express.static(path.join(__dirname,'public')));
 app.use(session({
   secret: 'konjo habesha',
   resave: false,
@@ -113,7 +119,8 @@ io.of("/update").on("connection",(socket)=>{
 
 
 app.get("*", (req,res)=>{
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+  res.render('index',{req});
+  //res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
 
