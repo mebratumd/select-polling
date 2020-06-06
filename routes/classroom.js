@@ -1165,7 +1165,7 @@ router.post("/expired",authenticated,(req,res,next) => {
         let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
         if (expiredElecClass.master == req.user.id) {
           if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
-            let countObjectArr = [...expiredElec.count];
+            let countObjectArr = _.shuffle([...expiredElec.count]);
             let winners = [];
             for(let x=0;x<expiredElec.vacancies;x++) {
               let maxVal = _.max(countObjectArr,(candidate)=>{
@@ -1261,6 +1261,8 @@ router.post("/expired",authenticated,(req,res,next) => {
                 if (elected.length < expiredElec__.vacancies) {
 
                   try {
+
+                    expiredElec__.count_STV = _.shuffle(expiredElec__.count_STV);
 
                     expiredElec__.count_STV.sort((a,b)=>{
                       return a.total - b.total;
