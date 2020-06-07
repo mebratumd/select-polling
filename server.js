@@ -13,7 +13,8 @@ const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
-const { AppServerModuleNgFactory, ngExpressEngine } = require('./public/server/main.js');
+
+
 
 //require('dotenv').config();
 
@@ -21,9 +22,6 @@ const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
-app.engine('html',ngExpressEngine({bootstrap:AppServerModuleNgFactory}))
-app.set('view engine','html');
-app.set('views',path.join(__dirname,'public/browser'));
 
 const classLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -51,10 +49,9 @@ app.use((req,res,next)=>{
   } else {
     next()
   }
-})
+});
 
-
-//app.use(express.static(path.join(__dirname,'public')));
+app.use(express.static(path.join(__dirname,'public/browser')));
 app.use(session({
   secret: 'konjo habesha',
   resave: false,
@@ -72,6 +69,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(require('prerender-node'));
 app.set('trust proxy', true); //
 
 app.use("/", auth);
@@ -119,8 +117,8 @@ io.of("/update").on("connection",(socket)=>{
 
 
 app.get("*", (req,res)=>{
-  res.render('index',{req});
-  //res.sendFile(path.join(__dirname, 'public/index.html'));
+
+  res.sendFile(path.join(__dirname, 'public/browser/index.html'));
 });
 
 
