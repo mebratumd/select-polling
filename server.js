@@ -23,7 +23,7 @@ const io = require('socket.io')(server);
 
 app.engine('html',ngExpressEngine({bootstrap:AppServerModuleNgFactory}))
 app.set('view engine','html');
-app.set('views',express.static(path.join(__dirname,'public/browser')))
+app.set('views',path.join(__dirname,'public/browser'));
 
 const classLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
