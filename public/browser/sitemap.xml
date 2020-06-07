@@ -20,6 +20,12 @@
 <url>
   <loc>https://www.selectpolling.ca/login</loc>
 </url>
+<url>
+  <loc>https://www.selectpolling.ca/privacy</loc>
+</url>
+<url>
+  <loc>https://www.selectpolling.ca/terms</loc>
+</url>
 
 
 </urlset>
