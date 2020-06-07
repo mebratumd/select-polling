@@ -709,6 +709,10 @@ check('duration').custom((time) => time >= 0 && time <= 168 ).withMessage("Durat
     }
   });
 
+  if (Object.keys(candidates).length > 15 || Object.keys(candidates).length < 1) {
+    return res.status(422).json({errors:[{msg:'The number of candidates must be between 1 and 15.'}]})
+  }
+
   if (req.body.vacancies >= Object.keys(candidates).length) {
     return res.status(422).json({ errors: [{msg:'The number of candidates must be greater than the number of vacancies.'}] });
   }
@@ -815,6 +819,10 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
               poll.candidates = classroom.students.filter((student) => {
                 return trueCandidates.indexOf(student.studentnumber.toString()) > -1
               });
+
+              if (poll.candidates.length > 15 || poll.candidates.length < 1) {
+                throw new Error('The number of candidates must be between 1 and 15.');
+              }
 
 
               poll.date = new Date();
