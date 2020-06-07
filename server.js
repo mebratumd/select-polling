@@ -41,7 +41,7 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-
+app.use(require('prerender-node'));
 app.use(sslRedirect());
 app.use((req,res,next)=>{
   if (!req.headers.host.match(/^www\./)) {
@@ -69,7 +69,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(require('prerender-node'));
+//app.use(require('prerender-node'));
 app.set('trust proxy', true); //
 
 app.use("/", auth);
