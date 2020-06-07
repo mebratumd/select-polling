@@ -1602,11 +1602,11 @@ router.get("/permission/:id",(req,res,next)=>{
           } else {
             let students = election.class.students.map(student => student.studentnumber);
             if (students.indexOf(req.user.studentnumber) > -1) {
-              delete election['class'];
+              delete election.class.students;
               return res.json({election:election});
             } else {
               if (election.class.master == req.user.id) {
-                delete election['class'];
+                delete election.class.students;
                 return res.json({election:election});
               } else {
                 return res.status(401).send();
