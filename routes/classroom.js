@@ -1565,8 +1565,9 @@ router.get("/permission/:id",(req,res,next)=>{
 
       Election.findOne({_id: req.params.id}).populate({
         path: 'class',
+        model: 'Classroom',
         select: 'students _id name'
-      }).select('-tokens -count.studentnumber -candidates.studentnumber -elected_STV.studentnumber -count_STV.studentnumber').lean().exec((err,election)=>{
+      }).select('-tokens -count.studentnumber -candidates.studentnumber -elected_STV.studentnumber -count_STV.studentnumber -winners.studentnumber').lean().exec((err,election)=>{
 
         if (err) {
           next(err)
