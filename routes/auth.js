@@ -448,9 +448,9 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
         }
 
         // deletes all elections associated with master classrooms
-        let master_rooms = await Classroom.find({_id:u.classrooms_master}).exec();
+        let master_rooms = await Classroom.find({_id:{$in:u.classrooms_master}}).exec();
         for(let i=0;i<master_rooms.length;i++) {
-          if (master_rooms[i].elections > 0) {
+          if (master_rooms[i].elections.length > 0) {
             await Election.deleteMany({_id:{$in:master_rooms[i].elections}},(err,docs)=>{});
           }
 
