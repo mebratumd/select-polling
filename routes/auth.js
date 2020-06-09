@@ -76,7 +76,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   }
 
   let emailSend = async (email,activationLink,name) => {
-    //let testAccount = await nodemailer.createTestAccount();
+
     let transporter = nodemailer.createTransport({
         host: "mail.privateemail.com",
         port: 587,
@@ -141,32 +141,22 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
     }
 
-    if (req.body.studentnumber) {
-      if (req.body.status == 'no') {
-        return res.status(422).json({errors:[{msg:`No student number required.`}]});
+    if (req.body.status == "yes") {
+      if (req.body.electionKey) {
+        const re = new RegExp('^[\\w]+$');
+
+        if(!re.test(req.body.electionKey)) {
+          return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
+        }
+
+        if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
+          return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
+        }
+
       } else {
-
-        const re = new RegExp('^[\\d]{5,10}$');
-        if (!re.test(req.body.studentnumber)) {
-          return res.status(422).json({errors:[{msg:`Student number must be between 5-10 digits.`}]});
-        }
-
-        if (req.body.electionKey) {
-          const re = new RegExp('^[\\w]+$');
-          if(!re.test(req.body.electionKey)) {
-            return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
-          }
-          if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
-            return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
-          }
-
-        }
-
+        return res.status(422).json({errors:[{msg:`Missing election key.`}]});
       }
-    } else {
-      if (req.body.status == 'yes') {
-        return res.status(422).json({errors:[{msg:`Missing student number.`}]});
-      }
+
     }
 
     // Username search
@@ -207,8 +197,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                         lastname: lastname,
                         email: req.body.email,
                         password: passwordHash,
-                        hash: uuidv4(), //activate hash
-                        studentnumber: req.body.studentnumber,
+                        hash: uuidv4(),
                         school: req.body.school,
                         active: false,
                         status: true,
@@ -363,13 +352,10 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
 
       student.classrooms_student.forEach((classroom)=>{
-        classroom.students.forEach((s)=>{
-          delete s['studentnumber'];
-        });
 
         classroom.elections.forEach((election)=>{
           if (election.electionAccess) {
-            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.email == student.email);
           }
         });
       });
@@ -378,7 +364,7 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
       student.classrooms_master.forEach((classroom)=>{
         classroom.elections.forEach((election)=>{
           if (election.electionAccess) {
-            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.studentnumber == student.studentnumber);
+            election.electionAccess = election.electionAccess.filter(accessObject => accessObject.email == student.email);
           }
         });
       });

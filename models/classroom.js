@@ -10,7 +10,7 @@ const classroomSchema = new mongoose.Schema({
   registered: Date,
   elections: [{type:mongoose.Schema.Types.ObjectId, ref:'Election'}],
   master: {type:mongoose.Schema.Types.ObjectId, ref:'Student'},
-  students: [{email:String, studentnumber:Number, name:String}],
+  students: [{email:String, name:String}],
   joined:Number
 });
 

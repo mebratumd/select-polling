@@ -22,6 +22,7 @@ const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
+app.use(require('prerender-node'));
 
 const classLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -41,7 +42,7 @@ mongoose.connect(process.env.MONGODB_URI, {useNewUrlParser: true})
 
 const PORT = process.env.PORT;
 
-app.use(require('prerender-node'));
+
 app.use(sslRedirect());
 app.use((req,res,next)=>{
   if (!req.headers.host.match(/^www\./)) {
@@ -69,7 +70,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
-//app.use(require('prerender-node'));
+
 app.set('trust proxy', true); //
 
 app.use("/", auth);
@@ -91,7 +92,7 @@ io.of("/update").on("connection",(socket)=>{
     Election.findById({"_id":electionID}).populate({
       path:'class',
       select: 'name'
-    }).select('-tokens -electionAccess -voteStatus -count.studentnumber -candidates.studentnumber').lean().exec((err,election)=>{
+    }).select('-tokens -electionAccess -voteStatus').lean().exec((err,election)=>{
       if (err) throw err
       if (election) {
         io.of("/update").in(socket.rooms[election._id]).emit("updatedCount",{updatedElection:election});
