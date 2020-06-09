@@ -387,33 +387,57 @@ router.get('/logout', authenticated, (req, res) => {
 
 router.post("/change-pwd",authenticated,[check('old').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
 check('new').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-check('confirm').custom((value,{req}) => value === req.body.new).withMessage('Passwords do not match.')],(req,res,next)=>{
+check('confirm').custom((value,{req}) => value === req.body.new).withMessage('Passwords do not match.'),
+check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
   }
 
-  bcrypt.compare(req.body.old,req.user.password,(err,resp)=>{
-    if (err) next(err)
-    if (resp) {
-      Student.findById(req.user.id).exec((err,user)=>{
-        if (err) next(err)
-        bcrypt.genSalt(10,(err,salt)=>{
-          if (err) next(err)
-          bcrypt.hash(req.body.new, salt, (err,hash)=>{
-            if (err) next(err)
-            user.password = hash;
-            user.save().then(() => res.json({}) ).catch((err) => next(err));
-          });
-        })
+  let p = new Promise((resolve,reject)=>{
 
-      });
-    } else {
-      return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
-    }
+    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+        let json = JSON.parse(body);
+        if (json.success) {
+          if (json.score <= 0.3) {
+            reject();
+          } else {
+            resolve();
+          }
+        } else {
+          reject();
+        }
+    });
 
   });
+
+  p.then(()=>{
+
+    bcrypt.compare(req.body.old,req.user.password,(err,resp)=>{
+      if (err) next(err)
+      if (resp) {
+        Student.findById(req.user.id).exec((err,user)=>{
+          if (err) next(err)
+          bcrypt.genSalt(10,(err,salt)=>{
+            if (err) next(err)
+            bcrypt.hash(req.body.new, salt, (err,hash)=>{
+              if (err) next(err)
+              user.password = hash;
+              user.save().then(() => res.json({}) ).catch((err) => next(err));
+            });
+          })
+
+        });
+      } else {
+        return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
+      }
+
+    });
+
+  }).catch(err => next(err))
+
+  
 
 
 });

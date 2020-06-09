@@ -55,20 +55,41 @@ router.post("/search",authenticated,[check('name').isLength({min:3,max:12}).with
   if (val){
     return val.toLowerCase();
   }
-})],(req,res,next)=>{
+}),
+check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.find({ name: {$regex: req.body.name } }).select('name school').limit(100).exec((err,rooms)=>{
+  let p = new Promise((resolve,reject)=>{
 
-    if (err) next(err)
+    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+        let json = JSON.parse(body);
+        if (json.success) {
+          if (json.score <= 0.3) {
+            reject();
+          } else {
+            resolve();
+          }
+        } else {
+          reject();
+        }
+    });
 
-    return res.json({classes:rooms});
+  })
 
-  });
+  p.then(()=>{
+    Classroom.find({ name: {$regex: req.body.name } }).select('name school').limit(100).exec((err,rooms)=>{
+
+      if (err) next(err)
+
+      return res.json({classes:rooms});
+
+    });
+
+  }).catch(err => next(err));
 
 });
 
