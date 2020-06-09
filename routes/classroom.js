@@ -91,7 +91,10 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
     });
 
-  }).catch(err => next(err));
+  }).catch((err) => {
+    console.log(err);
+    next(err)
+  });
 
 });
 
