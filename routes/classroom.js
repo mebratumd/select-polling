@@ -1621,13 +1621,8 @@ router.get("/permission/:id",(req,res,next)=>{
               if (idx+1 == election.electionAccess.length) {
                 if (req.user.id == election.class.master && (!election.class.partake || election.class.partake == undefined)) {
 
-                  if (election.voteStatus) {
-                    election.voteStatus = election.voteStatus.filter(voterObject => voterObject.email == student.email);
-                  }
-
-                  if (election.electionAccess) {
-                    election.electionAccess = election.electionAccess.filter(accessObject => accessObject.email == student.email);
-                  }
+                  election.voteStatus = [{didVote:true}];
+                  election.electionAccess = [];
 
                   let classSize = election.class.students.length;
 
