@@ -89,7 +89,7 @@ app.use("/",classLimiter); //
 io.of("/update").on("connection",(socket)=>{
 
   socket.on("check",(electionID)=>{
-    Election.findById({"_id":electionID}).populate({
+    Election.findById(electionID).populate({
       path:'class',
       select: 'name'
     }).select('-tokens -electionAccess -voteStatus').lean().exec((err,election)=>{
