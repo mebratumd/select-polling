@@ -58,6 +58,7 @@ router.post("/search",authenticated,[check('name').isLength({min:3,max:12}).with
 }),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
 
+  console.log(req.body);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
