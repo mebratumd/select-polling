@@ -342,7 +342,7 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
       select: 'type date duration title status electionAccess',
       options: {sort:{'date':'desc'}}
     }
-  }).select('-password -__v -active -key - hash -forgotPassword -forgotPasswordTimer').lean().exec((err,student)=>{
+  }).select('-password -__v -active -key -hash -forgotPassword -forgotPasswordTimer').lean().exec((err,student)=>{
 
     if (err) next(err)
 
@@ -576,7 +576,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
             }
 
           } else {
-            
+
             return res.status(422).json({errors:[{msg:'You must activate your account first before reseting your password.'}]});
 
 
