@@ -344,13 +344,13 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
             const studentemails = finalClassList.map((student)=>{ return student.email });
             const duplicateStudentEmail = studentemails.some((studentemail,idx)=>{
-              return studentemails.indexOf(studentemail.toLowerCase()) != idx;
+              return studentemails.indexOf(studentemail) != idx;
             });
             if (duplicateStudentEmail) {
               throw new Error('Duplicate student emails found. Each student should have a unique email address.');
             }
 
-            const studentnames = finalClassList.map((student)=>{ return student.name });
+            const studentnames = finalClassList.map((student)=>{ return student.name.toLowerCase() });
             const duplicateStudentName = studentnames.some((studentname,idx)=>{
               return studentnames.indexOf(studentname) != idx;
             });
@@ -558,11 +558,6 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
             //looking for duplicate email and student number
             let name = req.body.name.trim().replace(/\s\s+/g,' ').toLowerCase();
-            const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-' ]{5,40}$");
-            if (!re.test(name)) {
-              //error
-              throw new Error(`Invalid student name(s) found: ${name}. Names must be between 5-40 characters and contain only letters.`);
-            }
             room.students.forEach((student)=>{
               if (student.email == req.body.email) {
                 throw new Error('Duplicate email found.');
@@ -1037,6 +1032,24 @@ router.post("/vote",authenticated,[check('type').isIn(['stv','fpp','approval']).
     if (req.body.student.length <= 0) {
       return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
     }
+  }
+
+  if (req.body.type == "approval") {
+    if (Object.prototype.toString.call(req.body.student) != "[object Object]") {
+      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+    }
+  }
+
+  if (req.body.type == "fpp") {
+
+    if (Object.prototype.toString.call(req.body.student) != "[object Object]") {
+      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(req.body.student._id)) {
+      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+    }
+
   }
 
   const errors = validationResult(req);
