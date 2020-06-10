@@ -306,7 +306,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
         }
         // name
         if (i==1) {
-          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\-' ]{5,40}$");
+          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-' ]{5,40}$");
           if (!re.test(field)) {
             //error
             throw new Error(`Invalid student name(s) found: ${field}. Names must be between 5-40 characters and contain only letters.`);
@@ -558,6 +558,11 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
             //looking for duplicate email and student number
             let name = req.body.name.trim().replace(/\s\s+/g,' ').toLowerCase();
+            const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-' ]{5,40}$");
+            if (!re.test(name)) {
+              //error
+              throw new Error(`Invalid student name(s) found: ${name}. Names must be between 5-40 characters and contain only letters.`);
+            }
             room.students.forEach((student)=>{
               if (student.email == req.body.email) {
                 throw new Error('Duplicate email found.');
