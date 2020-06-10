@@ -14,8 +14,6 @@ const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
 
-
-
 //require('dotenv').config();
 
 const app = express();
@@ -70,9 +68,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.set('trust proxy', true); //
-
+app.set('trust proxy', true);
+app.use("/",classLimiter);
 app.use("/", auth);
 app.use("/class",classroom);
 
@@ -83,34 +80,44 @@ app.use((error,req,res,next)=>{
   }
 });
 
-app.use("/",classLimiter); //
+
 
 // update polls
 io.of("/update").on("connection",(socket)=>{
 
   socket.on("check",(electionID)=>{
-    Election.findById(electionID).populate({
-      path:'class',
-      select: 'name'
-    }).select('-tokens -electionAccess -voteStatus').lean().exec((err,election)=>{
-      if (err) throw err
-      if (election) {
-        io.of("/update").in(socket.rooms[election._id]).emit("updatedCount",{updatedElection:election});
-      }
+    if (mongoose.Types.ObjectId.isValid(electionID)) {
+      Election.findById(electionID).populate({
+        path:'class',
+        select: 'name'
+      }).select('-tokens -electionAccess -voteStatus').exec((err,election)=>{
+        if (err) {
+          console.log(err);
+        }
+        if (election) {
+          io.of("/update").in(socket.rooms[election._id]).emit("updatedCount",{updatedElection:election});
+        }
 
-    });
+      });
+    }
+
 
   });
 
   socket.on("joinElectionRoom",(electionID)=>{
-    Election.findById(electionID).exec((error,election)=>{
-      if (error) throw error
-      if (election) {
-        socket.join(election._id, ()=>{
+    if (mongoose.Types.ObjectId.isValid(electionID)) {
+      Election.findById(electionID).exec((error,election)=>{
+        if (error) {
+          console.log(error);
+        }
+        if (election) {
+          socket.join(election._id, ()=>{
 
-        });
-      }
-    });
+          });
+        }
+      });
+    }
+
   });
 
 

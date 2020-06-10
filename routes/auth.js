@@ -20,7 +20,6 @@ const authenticated = (req,res,next) => {
 
 }
 
-
 router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
@@ -34,7 +33,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     if (JSON.parse(body).score <= 0.3) {
       return res.status(422).json({errors:[{msg:'Something wrong.'}]});
     } else {
-
       passport.authenticate('local', (err, user, info) => {
         if (err) { return next(err); }
         if (!user) {
@@ -49,7 +47,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           return res.json({});
         });
       })(req, res, next);
-
 
     }
 
@@ -97,10 +94,10 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           <h1 style="text-align:center;">Select Polling</h1>
           <h2>Hi, ${name}</h2>
           <p>Thank you for signing up with <a href="https://www.selectpolling.ca/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
-          If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca</b></p><br>
-          <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>${activationLink}</a></span>
+          If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca.</b></p><br>
+          <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>ACTIVATE</a></span>
           <br><br>
-          <small style="display:block;margin-top:20px;">If you did not sign up, please disregard this message.</small>
+          <small style="display:block;margin-top:20px;">If you did not sign up with Select Polling, please disregard this message.</small>
         </div>` // html body
     });
 
@@ -159,9 +156,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
     }
 
-    // Username search
     Student.find({ username: req.body.username }, (error,student) => {
-      if (error) next(error)
+      if (error) throw new Error(error)
 
       if (student.length == 0) {
 
@@ -169,25 +165,25 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
           bcrypt.genSalt(10, (error,salt)=>{
 
-            if (error) next(error)
+            if (error) throw new Error(error)
 
             bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
 
-              if (error) next(error)
+              if (error) throw new Error(error)
 
               Student.find({ email: req.body.email }, (error,student)=>{
 
-                if (error) next(error)
+                if (error) throw new Error(error)
 
                 if (student.length == 0) {
 
                   bcrypt.genSalt(10, (err, salt_) => {
 
-                    if (err) next(err)
+                    if (err) throw new Error(err)
 
                     bcrypt.hash(req.body.password, salt_, (err, passwordHash) => {
 
-                      if (err) next(err)
+                      if (err) throw new Error(err)
 
                       let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
                       let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
@@ -207,14 +203,14 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                       });
 
                       newStudent.save((error,student)=>{
-                        if (error) next(error)
+                        if (error) throw new Error(error)
 
                         if (student) {
 
-                          emailSend(req.body.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
+                          emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
                             return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation.`});
                           }).catch((err) => {
-                            return next(err)
+                            next(err)
                           });
 
 
@@ -239,17 +235,18 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 
         } else {
-          // Not actually students but in the same collection.
+
           Student.find({ email:req.body.email }, (error,student)=>{
-            if (error) next(error)
+            if (error) throw new Error(error)
 
             if (student.length == 0) {
 
               bcrypt.genSalt(10, (err,salt) => {
-                if (err) next(err)
+                if (err) throw new Error(error)
+
                 bcrypt.hash(req.body.password, salt, (err, hash) => {
 
-                  if (err) next(err)
+                  if (err) throw new Error(err)
 
                   let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
                   let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
@@ -268,13 +265,15 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                   });
 
                   newMaster.save((error,master)=>{
-                    if (error) next(error)
+                    if (error) throw new Error(error)
 
                     if (master) {
 
-                      emailSend(req.body.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
+                      emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
                         return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation.`});
-                      }).catch(err => next(err));
+                      }).catch((err) => {
+                        next(err)
+                      });
 
 
                     } else {
@@ -296,10 +295,9 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       }
     });
 
-  }).catch(()=>{
-    return res.status(400).json({errors:[{msg:'Something wrong.'}]});
-  })
-
+  }).catch((e)=>{
+    next(e)
+  });
 
 });
 
@@ -319,13 +317,13 @@ router.get("/a/:username/:hash",(req,res,next)=>{
         user.hash = undefined;
         user.save().then(()=>{
           return res.send(`<p>Thank you for activating your account, ${user.firstname}. <a href="https://www.selectpolling.ca/login">Login</a></p>`)
-        }).catch((err) => res.send(`<p>There was an error. Please re-submit the link.</p>`));
+        }).catch((err) => res.send(`<p>There was an error. Please refresh the page.</p>`));
       } else {
-        return res.status(422).json({errors:[{msg:'Forbidden.'}]});
+        return res.status(401).json({errors:[{msg:'Forbidden.'}]});
       }
 
     } else {
-      return res.status(422).json({errors:[{msg:'This user does not exist.'}]});
+      return res.status(404).json({errors:[{msg:'This user does not exist.'}]});
     }
   });
 
@@ -344,22 +342,19 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
       select: 'type date duration title status electionAccess',
       options: {sort:{'date':'desc'}}
     }
-  }).select('-password -__v -active -key').lean().exec((err,student)=>{
+  }).select('-password -__v -active -key - hash -forgotPassword -forgotPasswordTimer').lean().exec((err,student)=>{
 
     if (err) next(err)
 
     if (student) {
 
-
       student.classrooms_student.forEach((classroom)=>{
-
         classroom.elections.forEach((election)=>{
           if (election.electionAccess) {
             election.electionAccess = election.electionAccess.filter(accessObject => accessObject.email == student.email);
           }
         });
       });
-
 
       student.classrooms_master.forEach((classroom)=>{
         classroom.elections.forEach((election)=>{
@@ -378,7 +373,7 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
 });
 
-router.get('/logout', authenticated, (req, res) => {
+router.get('/logout', authenticated,(req, res)=>{
 
   req.logout();
   return res.status(200).send();
@@ -415,14 +410,14 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   p.then(()=>{
 
     bcrypt.compare(req.body.old,req.user.password,(err,resp)=>{
-      if (err) next(err)
+      if (err) throw new Error(err);
       if (resp) {
         Student.findById(req.user.id).exec((err,user)=>{
-          if (err) next(err)
+          if (err) throw new Error(err)
           bcrypt.genSalt(10,(err,salt)=>{
-            if (err) next(err)
+            if (err) throw new Error(err)
             bcrypt.hash(req.body.new, salt, (err,hash)=>{
-              if (err) next(err)
+              if (err) throw new Error(err)
               user.password = hash;
               user.save().then(() => res.json({}) ).catch((err) => next(err));
             });
@@ -430,14 +425,14 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
         });
       } else {
-        return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
+        return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
       }
 
     });
 
   }).catch(err => next(err))
 
-  
+
 
 
 });
@@ -493,7 +488,7 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
       deleteUSER().catch(err => next(err));
 
     } else {
-      return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
+      return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
     }
 
   })
@@ -544,11 +539,30 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
       Student.findOne({email:req.body.email}).exec((err,student)=>{
         if (err) next(err)
         if (student){
-          const time = new Date().getTime();
 
-          if (student.forgotPassword) {
+          if (student.active) {
 
-            if (time - student.forgotPasswordTimer > 600000) {
+            const time = new Date().getTime();
+
+            if (student.forgotPassword) {
+
+              if (time - student.forgotPasswordTimer > 600000) {
+                student.forgotPassword = uuidv4();
+                student.forgotPasswordTimer = new Date().getTime();
+                student.save().then((student_) => {
+
+                  resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+                    return res.json({});
+                  }).catch((err)=>next(err));
+
+
+                }).catch((err)=>next(err))
+              } else {
+                // 10 minutes has not passed
+                return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
+              }
+
+            } else {
               student.forgotPassword = uuidv4();
               student.forgotPasswordTimer = new Date().getTime();
               student.save().then((student_) => {
@@ -559,33 +573,26 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
 
 
               }).catch((err)=>next(err))
-            } else {
-              // 10 minutes has not passed
-              return res.status(422).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
             }
 
           } else {
-            student.forgotPassword = uuidv4();
-            student.forgotPasswordTimer = new Date().getTime();
-            student.save().then((student_) => {
-
-              resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
-                return res.json({});
-              }).catch((err)=>next(err));
+            
+            return res.status(422).json({errors:[{msg:'You must activate your account first before reseting your password.'}]});
 
 
-            }).catch((err)=>next(err))
           }
 
 
 
 
+
+
         } else {
-          return res.status(422).json({ errors: [{msg:'This email is not registered with a user.'}]});
+          return res.status(404).json({ errors: [{msg:'This email is not registered with a user.'}]});
         }
       })
     } else {
-      return res.status(400).json({errors:[{msg:"Something wrong."}]});
+      return res.status(500).json({errors:[{msg:"Something wrong."}]});
     }
 
   });
@@ -605,7 +612,7 @@ router.get("/fpwd/:username/:hash",(req,res,next)=>{
     if (student) {
 
       if (student.forgotPassword !== req.params.hash) {
-        return res.status(403).send("Unauthorized.");
+        return res.status(401).send("Unauthorized.");
       } else {
         return res.json({username:student.username,forgotPassword:student.forgotPassword});
       }
@@ -639,17 +646,19 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
           if (student.forgotPassword != req.body.forgotPassword) {
             // error keys do not match
-            return res.status(403).json({errors:[{msg:"You do not have permission to perform this action."}]});
+            return res.status(401).json({errors:[{msg:"You do not have permission to perform this action."}]});
           } else {
             bcrypt.genSalt(10, (err, salt) => {
-                bcrypt.hash(req.body.password, salt, (err, hash) => {
-                    student.password = hash;
-                    student.forgotPassword = "";
-                    student.forgotPasswordTimer = 0;
-                    student.save().then(() => {
-                      return res.json({});
-                    }).catch(err => next(err));
-                });
+              if (err) next(err)
+              bcrypt.hash(req.body.password, salt, (err, hash) => {
+                if (err) next(err)
+                student.password = hash;
+                student.forgotPassword = "";
+                student.forgotPasswordTimer = 0;
+                student.save().then(() => {
+                  return res.json({});
+                }).catch(err => next(err));
+              });
             });
           }
 
@@ -662,12 +671,12 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
     } else {
       // error no key provided
-      return res.status(401).json({errors:[{msg:"Unauthorized: Key not provided."}]});
+      return res.status(422).json({errors:[{msg:"Key not provided."}]});
     }
 
   } else {
     // error no username provided
-    return res.status(401).json({errors:[{msg:"Unauthorized: No username."}]});
+    return res.status(422).json({errors:[{msg:"Missing username."}]});
   }
 
 });

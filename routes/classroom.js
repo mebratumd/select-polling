@@ -40,9 +40,9 @@ const authenticated = (req,res,next) => {
 
 const errorFile = (err,req,res,next) => {
   if (err.code == 'LIMIT_FILE_SIZE') {
-    return res.status(422).json({errors:[{msg:"File exceeds 100 MB."}]});
+    return res.status(501).json({errors:[{msg:"File exceeds 100 MB."}]});
   } else if (err.code == 'LIMIT_FILE_COUNT') {
-    return res.status(422).json({errors:[{msg:"Multiple files submitted. Only submit 1 CSV file with a class list."}]});
+    return res.status(501).json({errors:[{msg:"Multiple files submitted. Only submit 1 CSV file with a class list."}]});
   } else {
     next()
   }
@@ -53,13 +53,12 @@ const errorFile = (err,req,res,next) => {
 // dashboard endpoints
 
 router.post("/search",authenticated,[check('name').isLength({min:3,max:12}).withMessage('Searches must be between 3-12 characters.').matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
-  if (val){
+  if (val) {
     return val.toLowerCase();
   }
 }),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
 
-  console.log(req.body);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
@@ -85,14 +84,13 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   p.then(()=>{
     Classroom.find({ name: {$regex: req.body.name } }).select('name school').limit(100).exec((err,rooms)=>{
 
-      if (err) next(err)
+      if (err) throw new Error(err)
 
       return res.json({classes:rooms});
 
     });
 
   }).catch((err) => {
-    console.log(err);
     next(err)
   });
 
@@ -115,10 +113,12 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
     if (err) next(err)
     if (room) {
       bcrypt.compare(req.body.password,room.password,(err,resp)=>{
+
         if (err) next(err)
+
         if (resp){
           const student = room.students.filter((student)=>{
-            return student.email == req.user.email;
+            return student.email === req.user.email;
           });
 
           if (student.length > 0) {
@@ -150,7 +150,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
                   }).catch((err) => next(err));
 
                 } else {
-                  return res.status(422).json({errors:[{msg:`You have reached the limit for the amount of classrooms you can be a student in.`}]});
+                  return res.status(422).json({errors:[{msg:`You have reached the limit for the amount of classrooms you can be a student in (max 5).`}]});
                 }
 
               } else {
@@ -162,6 +162,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
             // not apart of classroom
             return res.status(422).json({errors:[{msg:`You are not in the class list for ${room.name}.`}]});
           }
+
         } else {
           // incorrect password
           return res.status(422).json({errors:[{msg:`Incorrect password for ${room.name}.`}]});
@@ -202,7 +203,7 @@ router.post("/edit",authenticated,upload.single('classfile'),errorFile,(req,res)
       Object.keys(row).sort().forEach((key)=>{
         let content = row[key].trim().replace(/\s\s+/g, ' ');
         if (content.length > 40) {
-          stream.emit('error', new Error(`${key} field too large.`));
+          stream.emit('error', new Error(`${key.replace(/^./,key[0].toUpperCase())} field too large.`));
         }
         sortedObject[key.toLowerCase()] = content;
       })
@@ -251,7 +252,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
   const studentCheck = (student) => {
     const headers = Object.keys(student).map(val => val.trim().replace(/\s+/g,'').toLowerCase());
-    const studentVals = Object.values(student).map(val => val.trim().replace(/\s\s+/g,' '));
+    const studentVals = Object.values(student).map(val => val.toLowerCase().trim().replace(/\s\s+/g,' '));
     const sorted = {};
     const clean = {};
 
@@ -305,10 +306,10 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
         }
         // name
         if (i==1) {
-          const re = new RegExp("^[\\w ]{2,40}$");
+          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ-' ]{5,40}$");
           if (!re.test(field)) {
             //error
-            throw new Error(`Invalid student name(s) found: ${field}. Names must be between 2-40 characters and contain only letters.`);
+            throw new Error(`Invalid student name(s) found: ${field}. Names must be between 5-40 characters and contain only letters.`);
           }
         }
 
@@ -320,9 +321,8 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
     }
 
     if (student.email == req.user.email) {
-      throw new Error(`Inputted user with the same email as you. Ensure each student has a unique email address.
-      If you are a student
-      and are planning to partake in elections leave your information out of the student list; it will be added on our end.`);
+      throw new Error(`Inputted student with the same email as you. Ensure each student has a unique email address.
+      If you are a student and are planning to partake in elections leave your information out of the student list; it will be added on our end.`);
     }
 
   }
@@ -332,9 +332,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
   Student.findById(req.user.id).exec((er,st)=>{
     if (er) next(er)
-    // less than or equal to 10 classrooms
     if (st.classrooms_master.length < 5) {
-
 
       Classroom.find({ name:req.body.classname },(err,classroom) => {
         if (err) next(err)
@@ -352,7 +350,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
               throw new Error('Duplicate student emails found. Each student should have a unique email address.');
             }
 
-            const studentnames = finalClassList.map((student)=>{ return student.name.toLowerCase() });
+            const studentnames = finalClassList.map((student)=>{ return student.name });
             const duplicateStudentName = studentnames.some((studentname,idx)=>{
               return studentnames.indexOf(studentname) != idx;
             });
@@ -364,12 +362,11 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
               if (req.user.status) {
 
                 let self = finalClassList.filter((student,i)=>{
-
-                  return student.email.toLowerCase() == req.user.email;
+                  return student.email == req.user.email;
                 });
 
                 if (self.length == 0) {
-                  finalClassList.push({_id:req.user._id,email:req.user.email,name:`${req.user.firstname} ${req.user.lastname}`});
+                  finalClassList.push({email:req.user.email,name:`${req.user.firstname} ${req.user.lastname}`});
                 } else {
                   throw new Error("Do not include your name in the class list. It will be added on our end.");
                 }
@@ -390,6 +387,8 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
             }
 
             bcrypt.genSalt(10, (err, salt) => {
+              if (err) next(err)
+
               bcrypt.hash(req.body.password, salt, (err, hash) => {
                 if (err) next(err)
                   // Store hash in your password DB.
@@ -566,7 +565,6 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               if (student.name.toLowerCase() == name) {
                 throw new Error('This name already exists in the class list.');
               }
-
             });
 
             // Valid email
@@ -779,116 +777,127 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
       if (error) next(error)
       try {
         if (classroom) {
-          if (classroom.master == req.user.id) {
 
-            const tokens = classroom.students.map((student)=>{
-              return {_id:student._id,email:student.email,hash:uuidv4()}
-            });
+          let ongoing = classroom.elections.filter(el => el.status == true);
 
-            sheet.forEach((poll,idx) => {
-
-              let validRestrictions = Object.keys(poll.restrictions).every((rest)=>{
-                return mongoose.Types.ObjectId.isValid(rest);
-              });
-
-              let validCandidates = Object.keys(poll.candidates).every((cand)=>{
-                return mongoose.Types.ObjectId.isValid(cand);
-              });
-
-              if (!validCandidates || !validRestrictions) {
-                throw new Error('Invalid input for candidates/restrictions.');
-              }
-
-
-              const restrictedStudentIds = Object.keys(poll.restrictions);
-              let restrictedCandidates = [];
-              const re = new RegExp('^[\\w]{5,50}$');
-              restrictedStudentIds.forEach((id)=>{
-                if (!re.test(id)) {
-                  throw new Error('Invalid format for election restrictions.');
-                }
-                if (poll.restrictions[id] == true) {
-                  restrictedCandidates.push(id);
-                } else if (poll.restrictions[id] == false) {
-                  // ignore
-                } else {
-                  throw new Error('Invalid format for election restrictions.');
-
-                }
-              });
-
-              let voterStat = classroom.students.map((student)=>{
-                if (restrictedCandidates.indexOf(student._id.toString()) == -1) {
-                  return {_id:student._id,email:student.email,didVote:false};
-                } else {
-                  return {_id:student._id,email:student.email,didVote:true};
-                }
-              });
-
-              const classStudentIds = classroom.students.map(student => student._id.toString());
-              trueCandidates = Object.keys(poll.candidates).filter(candidate => poll.candidates[candidate] == true);
-              trueCandidates.forEach((candidate)=>{
-                if (!classStudentIds.includes(candidate)) {
-                  throw new Error('Candidates must be a student in the class list.');
-
-                }
-              });
-
-              poll.candidates = classroom.students.filter((student) => {
-                return trueCandidates.indexOf(student._id.toString()) > -1
-              });
-
-              if (poll.candidates.length > 15 || poll.candidates.length < 1) {
-                throw new Error('The number of candidates must be between 1 and 15.');
-              }
-
-              poll.date = new Date();
-              poll.class = classroom.id;
-              poll.status = true;
-              if (poll.type == "fpp" || poll.type == "approval") {
-                poll.count = poll.candidates.map((ob) => { return { votes:0,_id:ob._id,name:ob.name } });
-              }
-
-              if (poll.type == "stv") {
-                poll.count_STV = poll.candidates.map((ob) => { return { _id:ob._id,name:ob.name,ranks:[] } });
-              }
-
-              poll.electionAccess = classroom.students.map((student) => { return {_id:student._id,email:student.email,permission:false} });
-              poll.voteStatus = voterStat;
-              poll.tokens = tokens;
-              if (poll.urls != undefined) {
-                poll.links = poll.urls;
-              }
-
-              if (poll.candidates.length <= poll.vacancies) {
-                // error
-                throw new Error('The number of candidates must exceed the number of vacancies.');
-                //return res.status(422).json({errors:[{msg:'The number of candidates must exceed the number of vacancies.'}]});
-
-              }
-
-
-            });
-
-
-            Election.insertMany(sheet).then((docs) => {
-              if (classroom.elections.length > 100) {
-                let remove = sheet.length + (classroom.elections.length - 100);
-                classroom.elections.splice(0,remove);
-              }
-              let ids = docs.map(e => e._id).forEach((id)=>{
-                classroom.elections.push(id);
-              });
-              classroom.save().then(()=>{
-                return res.json({});
-              }).catch(err=>next(err));
-            },(err)=>{
-              return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
-            });
-
+          if (ongoing.length > 0) {
+            return res.status(401).send("Elections are currently ongoing.");
           } else {
-            return res.status(422).json({errors:[{msg:'You do not have permission to create polls for this class.'}]});
+
+            if (classroom.master == req.user.id) {
+
+              const tokens = classroom.students.map((student)=>{
+                return {_id:student._id,email:student.email,hash:uuidv4()}
+              });
+
+              sheet.forEach((poll,idx) => {
+
+                let validRestrictions = Object.keys(poll.restrictions).every((rest)=>{
+                  return mongoose.Types.ObjectId.isValid(rest);
+                });
+
+                let validCandidates = Object.keys(poll.candidates).every((cand)=>{
+                  return mongoose.Types.ObjectId.isValid(cand);
+                });
+
+                if (!validCandidates || !validRestrictions) {
+                  throw new Error('Invalid input for candidates/restrictions.');
+                }
+
+
+                const restrictedStudentIds = Object.keys(poll.restrictions);
+                let restrictedCandidates = [];
+                const re = new RegExp('^[\\w]{5,50}$');
+                restrictedStudentIds.forEach((id)=>{
+                  if (!re.test(id)) {
+                    throw new Error('Invalid format for election restrictions.');
+                  }
+                  if (poll.restrictions[id] == true) {
+                    restrictedCandidates.push(id);
+                  } else if (poll.restrictions[id] == false) {
+                    // ignore
+                  } else {
+                    throw new Error('Invalid format for election restrictions.');
+
+                  }
+                });
+
+                let voterStat = classroom.students.map((student)=>{
+                  if (restrictedCandidates.indexOf(student._id.toString()) == -1) {
+                    return {_id:student._id,email:student.email,didVote:false};
+                  } else {
+                    return {_id:student._id,email:student.email,didVote:true};
+                  }
+                });
+
+                const classStudentIds = classroom.students.map(student => student._id.toString());
+                trueCandidates = Object.keys(poll.candidates).filter(candidate => poll.candidates[candidate] == true);
+                trueCandidates.forEach((candidate)=>{
+                  if (!classStudentIds.includes(candidate)) {
+                    throw new Error('Candidates must be a student in the class list.');
+
+                  }
+                });
+
+                poll.candidates = classroom.students.filter((student) => {
+                  return trueCandidates.indexOf(student._id.toString()) > -1
+                });
+
+                if (poll.candidates.length > 15 || poll.candidates.length < 1) {
+                  throw new Error('The number of candidates must be between 1 and 15.');
+                }
+
+                poll.date = new Date();
+                poll.class = classroom.id;
+                poll.status = true;
+                if (poll.type == "fpp" || poll.type == "approval") {
+                  poll.count = poll.candidates.map((ob) => { return { votes:0,_id:ob._id,name:ob.name } });
+                }
+
+                if (poll.type == "stv") {
+                  poll.count_STV = poll.candidates.map((ob) => { return { _id:ob._id,name:ob.name,ranks:[] } });
+                }
+
+                poll.electionAccess = classroom.students.map((student) => { return {_id:student._id,email:student.email,permission:false} });
+                poll.voteStatus = voterStat;
+                poll.tokens = tokens;
+                if (poll.urls != undefined) {
+                  poll.links = poll.urls;
+                }
+
+                if (poll.candidates.length <= poll.vacancies) {
+                  // error
+                  throw new Error('The number of candidates must exceed the number of vacancies.');
+
+                }
+
+
+              });
+
+
+              Election.insertMany(sheet).then((docs) => {
+                if (classroom.elections.length > 100) {
+                  let remove = sheet.length + (classroom.elections.length - 100);
+                  classroom.elections.splice(0,remove);
+                }
+                let ids = docs.map(e => e._id).forEach((id)=>{
+                  classroom.elections.push(id);
+                });
+                classroom.save().then(()=>{
+                  return res.json({});
+                }).catch(err=>next(err));
+              },(err)=>{
+                return res.status(422).json({errors:[{msg:'Oops. Something went wrong. Please try submitting again.'}]});
+              });
+
+            } else {
+              return res.status(422).json({errors:[{msg:'You do not have permission to create polls for this class.'}]});
+            }
+
+
           }
+
+
 
 
 
@@ -1014,7 +1023,7 @@ check('password').isLength({min:4}).withMessage("Password must be at least 4 cha
 
 });
 
-router.post("/vote",[check('type').isIn(['stv','fpp','approval']).withMessage('Invalid election type.')],authenticated,(req,res,next)=>{
+router.post("/vote",authenticated,[check('type').isIn(['stv','fpp','approval']).withMessage('Invalid election type.')],(req,res,next)=>{
 
   if (req.body.type == "stv") {
     if (Object.prototype.toString.call(req.body.student) != "[object Array]") {
@@ -1263,11 +1272,11 @@ router.post("/expired",authenticated,(req,res,next) => {
                       }
                     })
                   })
-                  expiredElec__.status = false;
-                  expiredElec__.elected_STV = elected_all;
-                  expiredElec__.electionAccess = undefined;
-                  expiredElec__.voteStatus = undefined;
-                  await expiredElec__.save();
+                  expiredElec_.status = false;
+                  expiredElec_.elected_STV = elected_all;
+                  expiredElec_.electionAccess = undefined;
+                  expiredElec_.voteStatus = undefined;
+                  await expiredElec_.save();
 
                 } else {
                   elected = [];
