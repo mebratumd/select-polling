@@ -306,7 +306,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
         }
         // name
         if (i==1) {
-          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ-' ]{5,40}$");
+          const re = new RegExp("^[\\w'- ]{5,40}$");
           if (!re.test(field)) {
             //error
             throw new Error(`Invalid student name(s) found: ${field}. Names must be between 5-40 characters and contain only letters.`);
