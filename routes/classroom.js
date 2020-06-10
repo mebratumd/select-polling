@@ -252,7 +252,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
   const studentCheck = (student) => {
     const headers = Object.keys(student).map(val => val.trim().replace(/\s+/g,'').toLowerCase());
-    const studentVals = Object.values(student).map(val => val.toLowerCase().trim().replace(/\s\s+/g,' '));
+    const studentVals = Object.values(student).map(val => val.trim().replace(/\s\s+/g,' '));
     const sorted = {};
     const clean = {};
 
@@ -320,7 +320,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
       throw new Error('Incorrectly formatted information. Check class list.');
     }
 
-    if (student.email == req.user.email) {
+    if (student.email.toLowerCase() == req.user.email) {
       throw new Error(`Inputted student with the same email as you. Ensure each student has a unique email address.
       If you are a student and are planning to partake in elections leave your information out of the student list; it will be added on our end.`);
     }
@@ -344,7 +344,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
             const studentemails = finalClassList.map((student)=>{ return student.email });
             const duplicateStudentEmail = studentemails.some((studentemail,idx)=>{
-              return studentemails.indexOf(studentemail) != idx;
+              return studentemails.indexOf(studentemail.toLowerCase()) != idx;
             });
             if (duplicateStudentEmail) {
               throw new Error('Duplicate student emails found. Each student should have a unique email address.');
