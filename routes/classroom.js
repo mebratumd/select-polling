@@ -696,6 +696,7 @@ check('description').isLength({min:20,max:500}).withMessage("Description must be
     return val.trim().replace(/\s\s+/g, ' ')
   }
 }),
+check('approvalRate').optional(),
 check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
 
 
@@ -729,7 +730,7 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
-  if (req.body.approvalRate) {
+  if (typeof req.body.approvalRate == "number" && req.body.typeof == "approval") {
     let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
   } else {
     let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
