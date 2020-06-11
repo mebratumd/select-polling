@@ -705,6 +705,10 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     return res.status(422).json({ errors: errors.array() });
   }
 
+  if (req.body.vacancies > 5) {
+    return res.status(422).json({errors:[{msg:'Vacancies to be filled cannot exceed 5.'}]});
+  }
+
 
   const studentIds = Object.keys(req.body.candidates);
   let candidates = {};
@@ -811,6 +815,10 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
 
                 if (!validCandidates || !validRestrictions) {
                   throw new Error('Invalid input for candidates/restrictions.');
+                }
+
+                if (poll.vacancies > 5) {
+                  throw new Error('Vacancies to be filled cannot exceed 5');
                 }
 
 
