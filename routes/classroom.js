@@ -729,7 +729,14 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
-  let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
+  if (req.body.approvalRate) {
+    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
+  } else {
+    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
+  }
+
+
+
 
   return res.json({election:ticketBody});
 
@@ -852,6 +859,15 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
                 poll.status = true;
                 if (poll.type == "fpp" || poll.type == "approval") {
                   poll.count = poll.candidates.map((ob) => { return { votes:0,_id:ob._id,name:ob.name } });
+                }
+
+                if (poll.type == "approval" && poll.vacancies == 1) {
+                  if (typeof poll.approvalRate != "number") {
+                    throw new Error("Approval rate should be a number between 1-100.");
+                  }
+                  if (poll.approvalRate > 100 || poll.approvalRate < 1) {
+                    throw new Error("Approval rate should be a number between 1-100.");
+                  }
                 }
 
                 if (poll.type == "stv") {
@@ -1228,29 +1244,60 @@ router.post("/expired",authenticated,(req,res,next) => {
           let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
           if (expiredElecClass.master == req.user.id) {
             if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
-              let countObjectArr = _.shuffle([...expiredElec.count]);
-              let winners = [];
-              for(let x=0;x<expiredElec.vacancies;x++) {
-                let maxVal = _.max(countObjectArr,(candidate)=>{
-                  return candidate.votes
-                });
-                winners.push(maxVal);
-                countObjectArr.splice(countObjectArr.indexOf(maxVal),1);
-              }
-              expiredElec.winners = winners;
-              const start = new Date(expiredElec.date).getTime();
-              const duration = expiredElec.duration * 3600000;
-              const expiration = start + duration;
-              const current = new Date().getTime();
-              const expired = current < expiration ? false : true;
-              if (expired && expiredElec.status) {
-                expiredElec.status = false;
-                expiredElec.electionAccess = undefined;
-                expiredElec.voteStatus = undefined;
-                await expiredElec.save();
+              if (expiredElec.type == "approval" && expiredElec.vacancies == 1) {
+                let totalVotesForCandidate = expiredElec.count[0].votes;
+                let candidateApprovalRating = (totalVotesForCandidate / expiredElec.total) * 100;
+                if (candidateApprovalRating > expiredElec.approvalRate) {
+                  // winner
+                  expiredElec.winners = expiredElec.count;
+                } else {
+                  // loser
+                  expiredElec.winners = [];
+                }
+
+                const start = new Date(expiredElec.date).getTime();
+                const duration = expiredElec.duration * 3600000;
+                const expiration = start + duration;
+                const current = new Date().getTime();
+                const expired = current < expiration ? false : true;
+                if (expired && expiredElec.status) {
+                  expiredElec.status = false;
+                  expiredElec.electionAccess = undefined;
+                  expiredElec.voteStatus = undefined;
+                  await expiredElec.save();
+                } else {
+                  throw new Error();
+                }
+
               } else {
-                throw new Error();
+                let countObjectArr = _.shuffle([...expiredElec.count]);
+                let winners = [];
+                for(let x=0;x<expiredElec.vacancies;x++) {
+                  let maxVal = _.max(countObjectArr,(candidate)=>{
+                    return candidate.votes
+                  });
+                  winners.push(maxVal);
+                  countObjectArr.splice(countObjectArr.indexOf(maxVal),1);
+                }
+
+                expiredElec.winners = winners;
+                const start = new Date(expiredElec.date).getTime();
+                const duration = expiredElec.duration * 3600000;
+                const expiration = start + duration;
+                const current = new Date().getTime();
+                const expired = current < expiration ? false : true;
+                if (expired && expiredElec.status) {
+                  expiredElec.status = false;
+                  expiredElec.electionAccess = undefined;
+                  expiredElec.voteStatus = undefined;
+                  await expiredElec.save();
+                } else {
+                  throw new Error();
+                }
+
+
               }
+
             } else if (expiredElec.type == "stv") {
               let expiredElec_ = await Election.findById(ids[i]).exec();
               expiredElec_.count_STV.sort((a,b)=>{

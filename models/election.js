@@ -22,6 +22,7 @@ const electionSchema = new mongoose.Schema({
   electionAccess: [{email:String,permission:Boolean}],
   voteStatus: [{email:String,didVote:Boolean}],
   description: String,
+  approvalRate: Number
 });
 
 module.exports = mongoose.model('Election',electionSchema);
