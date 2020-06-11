@@ -730,11 +730,10 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
-  let ticketBody;
-  if (typeof req.body.approvalRate == "number" && req.body.typeof == "approval") {
-    ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
+  if (typeof req.body.approvalRate == "number" && req.body.typeof == "approval" && Object.keys(candidates).length == 1) {
+    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
   } else {
-    ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
+    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
   }
 
 
@@ -863,7 +862,7 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
                   poll.count = poll.candidates.map((ob) => { return { votes:0,_id:ob._id,name:ob.name } });
                 }
 
-                if (poll.type == "approval" && poll.vacancies == 1) {
+                if (poll.type == "approval" && poll.vacancies == 1 && Object.keys(poll.candidates).length == 1) {
                   if (typeof poll.approvalRate != "number") {
                     throw new Error("Approval rate should be a number between 1-100.");
                   }
@@ -1246,7 +1245,7 @@ router.post("/expired",authenticated,(req,res,next) => {
           let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
           if (expiredElecClass.master == req.user.id) {
             if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
-              if (expiredElec.type == "approval" && expiredElec.vacancies == 1) {
+              if (expiredElec.type == "approval" && expiredElec.vacancies == 1 && Object.keys(poll.candidates).length == 1) {
                 let totalVotesForCandidate = expiredElec.count[0].votes;
                 let candidateApprovalRating = (totalVotesForCandidate / expiredElec.total) * 100;
                 if (candidateApprovalRating > expiredElec.approvalRate) {
