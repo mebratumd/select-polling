@@ -870,6 +870,8 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
                   if (poll.approvalRate > 100 || poll.approvalRate < 1) {
                     throw new Error("Approval rate should be a number between 1-100.");
                   }
+                } else {
+                  poll.approvalRate = undefined;
                 }
 
                 if (poll.type == "stv") {
