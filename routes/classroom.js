@@ -1187,6 +1187,9 @@ router.post("/vote",authenticated,[check('type').isIn(['stv','fpp','approval']).
                     elec.count.forEach((ob)=>{
                       if (req.body.student[ob._id.toString()] == true) {
                         ob.votes = ob.votes + 1;
+                        if (elec.candidates.length == 1) {
+                          elec.canApprovalRate = ( ob.votes/(elec.total + 1) ) * 100;
+                        }
                       }
                     });
 
