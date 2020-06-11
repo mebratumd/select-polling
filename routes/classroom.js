@@ -730,10 +730,11 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     }
   });
 
+  let ticketBody;
   if (typeof req.body.approvalRate == "number" && req.body.typeof == "approval") {
-    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
+    ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies,approvalRate:req.body.approvalRate};
   } else {
-    let ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
+    ticketBody = {type:req.body.typeof,candidates:candidates,restrictions:restrictedCandidates,title:req.body.title,description:req.body.description,duration:req.body.duration,links:req.body.urls,vacancies:req.body.vacancies};
   }
 
 
