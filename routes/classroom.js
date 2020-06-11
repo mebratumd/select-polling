@@ -717,8 +717,8 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     return res.status(422).json({errors:[{msg:'The number of candidates must be between 1 and 15.'}]})
   }
 
-  if (req.body.vacancies >= Object.keys(candidates).length) {
-    return res.status(422).json({ errors: [{msg:'The number of candidates must be greater than the number of vacancies.'}] });
+  if (req.body.vacancies > Object.keys(candidates).length) {
+    return res.status(422).json({ errors: [{msg:'The number of vacancies cannot exceed the number of candidates.'}] });
   }
 
   const restrictedStudentIds = Object.keys(req.body.restrictions);
@@ -865,9 +865,9 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
                   poll.links = poll.urls;
                 }
 
-                if (poll.candidates.length <= poll.vacancies) {
+                if (poll.candidates.length < poll.vacancies) {
                   // error
-                  throw new Error('The number of candidates must exceed the number of vacancies.');
+                  throw new Error('The number of candidates must be equal to or exceed the number of vacancies.');
 
                 }
 
