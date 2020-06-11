@@ -688,7 +688,7 @@ router.post("/ticket",authenticated,[check('title').isLength({min:10,max:150}).w
 }),
 check('typeof').isIn(['stv','fpp','approval']).withMessage('Invalid election type.'),
 check('vacancies').isInt().withMessage('Vacancies must be an integer.'),
-check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.'),
+check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.').isLength({max:500}).withMessage('URL is too large.'),
 check('restrictions').custom((resOb) => Object.prototype.toString.call(resOb) == "[object Object]").withMessage('Incorrect format detected.'),
 check('candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
 check('description').isLength({min:20,max:500}).withMessage("Description must be between 20-500 characters.").customSanitizer(val => {
@@ -756,7 +756,7 @@ router.post("/submit-ticket",authenticated,[check('sheet.*.title').isLength({min
   }
 }),
 check('sheet').custom((electionSheet) => electionSheet.length < 20 && electionSheet.length > 0).withMessage('The ticket must be less than 20 elections.'),
-check('sheet.*.links.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.'),
+check('sheet.*.links.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.').isLength({max:500}).withMessage('URL is too large.'),
 check('sheet.*.restrictions').custom((restrictedOb) => Object.prototype.toString.call(restrictedOb) == "[object Object]").withMessage('Incorrect format.'),
 check('sheet.*.candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
 check('sheet.*.description').isLength({min:20,max:500}).withMessage("All descriptions must be between 20-500 characters.").customSanitizer(val => {
