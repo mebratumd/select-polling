@@ -722,9 +722,24 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
     return res.status(422).json({errors:[{msg:'The number of candidates must be between 1 and 15.'}]})
   }
 
-  if (req.body.vacancies > Object.keys(candidates).length) {
-    return res.status(422).json({ errors: [{msg:'The number of vacancies cannot exceed the number of candidates.'}] });
+
+  if (req.body.typeof != "approval") {
+    if (req.body.vacancies >= Object.keys(candidates).length) {
+      return res.status(422).json({ errors: [{msg:'The number of candidates must exceed the number of vacancies.'}] });
+    }
+  } else {
+    if (Object.keys(candidates).length == 1) {
+      if (req.body.vacancies != 1) {
+        return res.status(422).json({ errors: [{msg:'The number of vacancies must be 1.'}] });
+      }
+    } else {
+      if (req.body.vacancies >= Object.keys(candidates).length) {
+        return res.status(422).json({ errors: [{msg:'The number of candidates must exceed the number of vacancies.'}] });
+      }
+    }
+
   }
+
 
   const restrictedStudentIds = Object.keys(req.body.restrictions);
   let restrictedCandidates = {};
@@ -893,9 +908,29 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
                   poll.links = poll.urls;
                 }
 
-                if (poll.candidates.length < poll.vacancies) {
-                  // error
-                  throw new Error('The number of candidates must be equal to or exceed the number of vacancies.');
+
+                if (poll.type != "approval") {
+
+                  if (poll.candidates.length <= poll.vacancies) {
+                    throw new Error('The number of candidates must exceed the number of vacancies.');
+                  }
+
+                } else {
+
+                  if (poll.candidates.length == 1) {
+
+                    if (poll.vacancies != 1) {
+                      throw new Error('The number of vacancies must be 1.');
+                    }
+
+                  } else {
+
+                    if (poll.candidates.length <= poll.vacancies) {
+                      throw new Error('The number of candidates must exceed the number of vacancies.');
+                    }
+
+                  }
+
 
                 }
 
