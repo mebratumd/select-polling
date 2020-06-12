@@ -65,7 +65,7 @@ check('username').isLength({min:4,max:12}).withMessage("Username must be between
   if (val) {
     return val.toLowerCase();
   }
-),
+}),
 check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("First name must only contain letters.").customSanitizer((val) => {
   if (val) {
     return val.toLowerCase();
