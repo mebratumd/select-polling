@@ -224,7 +224,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                         if (student) {
 
                           emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation.`});
+                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation. If not present in your inbox, please check junk mail.`});
                           }).catch((err) => {
                             next(err)
                           });
@@ -286,7 +286,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                     if (master) {
 
                       emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation.`});
+                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation. If not present in your inbox, please check junk mail.`});
                       }).catch((err) => {
                         next(err)
                       });
