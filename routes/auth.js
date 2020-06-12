@@ -20,7 +20,11 @@ const authenticated = (req,res,next) => {
 
 }
 
-router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
+router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer((val) => {
+  if (val) {
+    return val.toLowerCase();
+  }
+}),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
@@ -57,9 +61,21 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 router.post("/register", [check('email').isEmail().withMessage("Invalid email.").normalizeEmail(),
 check('status').isIn(['yes','no']).withMessage('Please submit a valid status.'),
-check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer(val => val.toLowerCase()),
-check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("First name must only contain letters.").customSanitizer(val => val.toLowerCase()),
-check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Last name must only contain letters.").customSanitizer(val => val.toLowerCase()),
+check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer((val) => {
+  if (val) {
+    return val.toLowerCase();
+  }
+),
+check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("First name must only contain letters.").customSanitizer((val) => {
+  if (val) {
+    return val.toLowerCase();
+  }
+}),
+check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Last name must only contain letters.").customSanitizer((val) => {
+  if (val) {
+    return val.toLowerCase();
+  }
+}),
 check("school").isIn(['University of Manitoba']).withMessage("School not found."),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
 check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match."),
