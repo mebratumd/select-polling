@@ -28,6 +28,7 @@ router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Us
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
+
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });

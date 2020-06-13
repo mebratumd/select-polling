@@ -1093,7 +1093,7 @@ router.post("/vote",authenticated,[check('type').isIn(['stv','fpp','approval']).
       return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
     }
     if (req.body.student.length <= 0) {
-      return res.status(422).json({ errors: [{msg:'Invalid submission.'}] });
+      return res.status(422).json({ errors: [{msg:'Invalid submission. Please rank at least 1 candidate.'}] });
     }
   }
 
