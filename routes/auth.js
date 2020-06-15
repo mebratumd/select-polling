@@ -168,6 +168,10 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
         }
 
+        if (req.body.electionKey != req.body.cElectionKey) {
+          return res.status(422).json({errors:[{msg:'Election keys do not match.'}]});
+        }
+
       } else {
         return res.status(422).json({errors:[{msg:`Missing election key.`}]});
       }
