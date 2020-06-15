@@ -111,6 +111,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>ACTIVATE</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not sign up with Select Polling, please disregard this message.</small>
+          <div style="text-align:center;margin-top:20px;">
+            2020 &copy; Select Polling. All Rights Reserved.<br>
+            Questions? contact@selectpolling.ca<br>
+            <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
+          </div>
         </div>` // html body
     });
 
@@ -530,13 +535,18 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
         text: `Hi, ${name}. Please click the URL or copy and paste it into your browser to activate your account: ${resetLink}`, // plain text body
         html: `
         <div>
-          <h1 style="text-align:center;">Select Polling</h1>
+          <h1 style="text-align:center;"><img height="20" width="20" src="https://www.selectpolling.ca/favicon.ico"> Select Polling</h1>
           <h2>Hi, ${name}</h2>
           <p>To complete the password reset of your account click the URL below or copy and paste it into your browser.
           If for any reason you are having troubles please contact us at <b>contact@selectpolling.ca</b>.</p><br>
           <span style="margin-top:10px;padding:10px;"><a href=${resetLink}>${resetLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not ask for a password reset, please disregard this message.</small>
+          <div style="text-align:center;margin-top:20px;">
+            2020 &copy; Select Polling. All Rights Reserved.<br>
+            Questions? contact@selectpolling.ca<br>
+            <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
+          </div>
         </div>` // html body
     });
   }
