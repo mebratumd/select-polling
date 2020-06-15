@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 module.exports = (passport) => {
   passport.use(new LocalStrategy(
     (username, password, done) => {
-      Student.findOne({ username: username }, (err, user) => {
+      Student.findOne({ username: username.toLowerCase() }, (err, user) => {
         if (err) { return done(err); }
         if (!user) {
           return done(null, false, { message: 'This user does not exist.',active:true }); //

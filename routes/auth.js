@@ -20,12 +20,8 @@ const authenticated = (req,res,next) => {
 
 }
 
-router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer((val) => {
-  if (val) {
-    return val.toLowerCase();
-  }
-}),
-check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Username must only contain letters (french or english) and/or numbers."),
+check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
 
@@ -60,25 +56,25 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 });
 
-router.post("/register", [check('email').isEmail().withMessage("Invalid email.").normalizeEmail(),
+router.post("/register", [check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail(),
 check('status').isIn(['yes','no']).withMessage('Please submit a valid status.'),
-check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Username must be alphanumeric.").customSanitizer((val) => {
+check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Username must only contain letters (french or english) and/or numbers.").customSanitizer((val) => {
   if (val) {
     return val.toLowerCase();
   }
 }),
-check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("First name must only contain letters.").customSanitizer((val) => {
+check("firstname").isLength({min:2,max:16}).withMessage("First name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-\\.']+$/).withMessage("First name must only contain letters (french or english), hyphens, periods, or apostrophes.").customSanitizer((val) => {
   if (val) {
     return val.toLowerCase();
   }
 }),
-check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Last name must only contain letters.").customSanitizer((val) => {
+check("lastname").isLength({min:2,max:16}).withMessage("Last name must be between 2-16 characters.").matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-\\.']+$/).withMessage("Last name must only contain letters (french or english), hyphens, periods, or apostrophes.").customSanitizer((val) => {
   if (val) {
     return val.toLowerCase();
   }
 }),
 check("school").isIn(['University of Manitoba']).withMessage("School not found."),
-check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")
 ],(req,res,next) => {
@@ -118,8 +114,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
         </div>` // html body
     });
 
-    console.log(`Activation email sent to ${email}`);
-
   }
 
   let p = new Promise((resolve,reject)=>{
@@ -157,10 +151,10 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
     if (req.body.status == "yes") {
       if (req.body.electionKey) {
-        const re = new RegExp('^[\\w]+$');
+        const re = new RegExp('^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$');
 
         if(!re.test(req.body.electionKey)) {
-          return res.status(422).json({errors:[{msg:`Election key must be alphanumeric.`}]});
+          return res.status(422).json({errors:[{msg:`Election key must contain only letters (french or english), or numbers.`}]});
         }
 
         if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
@@ -225,7 +219,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                         if (student) {
 
                           emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation. If not present in your inbox, please check junk mail.`});
+                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation. If the activation email is not present in your inbox, please check junk mail.`});
                           }).catch((err) => {
                             next(err)
                           });
@@ -287,7 +281,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                     if (master) {
 
                       emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation. If not present in your inbox, please check junk mail.`});
+                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation. If the activation email is not present in your inbox, please check junk mail.`});
                       }).catch((err) => {
                         next(err)
                       });
@@ -318,7 +312,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 });
 
-
 router.get("/a/:username/:hash",(req,res,next)=>{
 
   Student.findOne({username:req.params.username}).exec((err,user)=>{
@@ -346,7 +339,6 @@ router.get("/a/:username/:hash",(req,res,next)=>{
 
 
 });
-
 
 router.get("/loggedin",authenticated,(req,res,next)=>{
 
@@ -397,8 +389,8 @@ router.get('/logout', authenticated,(req, res)=>{
 
 });
 
-router.post("/change-pwd",authenticated,[check('old').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-check('new').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+router.post("/change-pwd",authenticated,[check('old').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
+check('new').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('confirm').custom((value,{req}) => value === req.body.new).withMessage('Passwords do not match.'),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
 
@@ -454,7 +446,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 });
 
-router.post("/delete-account",authenticated,[check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req,res,next)=>{
+router.post("/delete-account",authenticated,[check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers.")],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -512,7 +504,7 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
 
 });
 
-router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,12}@/).withMessage('Email address must be alphanumeric and between 4-12 characters in length.').normalizeEmail()],(req,res,next)=>{
+router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail()],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -644,7 +636,7 @@ router.get("/fpwd/:username/:hash",(req,res,next)=>{
 
 });
 
-router.post("/fpwd/change",[check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+router.post("/fpwd/change",[check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")],(req,res,next)=>{
 
   const errors = validationResult(req);

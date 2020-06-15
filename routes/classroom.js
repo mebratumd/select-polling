@@ -52,17 +52,15 @@ const errorFile = (err,req,res,next) => {
 
 // dashboard endpoints
 
-router.post("/search",authenticated,[check('name').isLength({min:3,max:12}).withMessage('Searches must be between 3-12 characters.').matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
-  if (val) {
-    return val.toLowerCase();
-  }
-}),
+router.post("/search",authenticated,[check('name').isLength({min:3,max:12}).withMessage('Searches must be between 3-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req,res,next)=>{
+
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
   }
+
 
   let p = new Promise((resolve,reject)=>{
 
@@ -82,7 +80,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   })
 
   p.then(()=>{
-    Classroom.find({ name: {$regex: req.body.name } }).select('name school').limit(100).exec((err,rooms)=>{
+
+    Classroom.find({ name: {$regex: req.body.name, $options: 'i' } }).select('name school').limit(100).exec((err,rooms)=>{
 
       if (err) throw new Error(err)
 
@@ -97,8 +96,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 });
 
 
-router.post("/password",authenticated,[check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
-check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val=>{
+router.post("/password",authenticated,[check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must contain letters (french or english) and/or numbers."),
+check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must contain letters (french or english) and/or numbers.").customSanitizer(val=>{
   if (val){
     return val.toLowerCase();
   }
@@ -231,14 +230,14 @@ router.post("/edit",authenticated,upload.single('classfile'),errorFile,(req,res)
 
 });
 
-router.post("/submit",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/submit",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val) {
     return val.toLowerCase();
   }
 }),
 check('school').isIn(['University of Manitoba']).withMessage("School not found."),
 check('partake').isIn([true,false]).withMessage("Partake status must be either 'yes' or 'no'"),
-check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric."),
+check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")], (req,res,next)=>{
 
   const errors = validationResult(req);
@@ -251,8 +250,8 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
   let finalClassList = [];
 
   const studentCheck = (student) => {
-    const headers = Object.keys(student).map(val => val.trim().replace(/\s+/g,'').toLowerCase());
-    const studentVals = Object.values(student).map(val => val.trim().replace(/\s\s+/g,' '));
+    const headers = Object.keys(student).map(val => val.trim().replace(/\s/g,'').toLowerCase());
+    const studentVals = Object.values(student).map(val => val.trim().replace(/\s/g,' '));
     const sorted = {};
     const clean = {};
 
@@ -290,7 +289,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
             });
 
             if (!pass) {
-              throw new Error(`Invalid email extension(s) found: ${field}. Please ensure all emails are from the ${req.body.school}`);
+              throw new Error(`Invalid email found: ${field}. Please ensure all emails are 4-25 characters in length before the @ symbol and are from the ${req.body.school}. Characters include letters (english), numbers, periods or underscores.`);
             }
 
 
@@ -299,17 +298,17 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
             const re = new RegExp(`^[\\w.]{4,25}@${schoolExtensions[req.body.school]}$`);
             if (!re.test(field)) {
               //error
-              throw new Error(`Invalid email extension(s) found: ${field}. Please ensure all emails are from the ${req.body.school}`);
+              throw new Error(`Invalid email found: ${field}. Please ensure all emails are 4-25 characters in length before the @ symbol and are from the ${req.body.school}. Characters include letters (english), numbers, periods or underscores.`);
             }
-          }
 
         }
+      }
         // name
         if (i==1) {
-          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-' ]{5,40}$");
+          const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-\\.' ]{5,33}$");
           if (!re.test(field)) {
             //error
-            throw new Error(`Invalid student name(s) found: ${field}. Names must be between 5-40 characters and contain only letters.`);
+            throw new Error(`Invalid student name(s) found: ${field}. Names must be between 5-33 characters and contain only letters (french or english), spaces, apostrophes, or hyphens.`);
           }
         }
 
@@ -355,7 +354,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
               return studentnames.indexOf(studentname) != idx;
             });
             if (duplicateStudentName) {
-              throw new Error('Duplicate student names found. Each student should have a unique email address.');
+              throw new Error('Duplicate student names found. Each student should have a unique name.');
             }
 
             if (req.body.partake == "true") {
@@ -444,7 +443,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
 // classroom endopoints
 
-router.post("/delete-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/delete-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val){
     return val.toLowerCase();
   }
@@ -526,17 +525,17 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
 });
 
-router.post("/add-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/add-student",authenticated,[check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val){
     return val.toLowerCase();
   }
 }),
-check('name').isLength({min:2,max:40}).withMessage('Name must be between 2-40 characters (including spaces).').matches(/^[\w ]+$/).withMessage('Name must be alphanumeric.').customSanitizer(val => {
+check('name').isLength({min:5,max:33}).withMessage('Name must be between 5-33 characters.').matches(/^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-\\.' ]+$/).withMessage('Name must only contain letters (french or english), spaces, periods, apostrophes, or hyphens.').customSanitizer(val => {
   if (val) {
-    return val.trim().replace(/\s\s+/g,' ')
+    return val.trim().replace(/\s/g,' ')
   }
 }),
-check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,res,next)=>{
+check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail()], (req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -557,12 +556,11 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
 
             //looking for duplicate email and student number
-            let name = req.body.name.trim().replace(/\s\s+/g,' ').toLowerCase();
             room.students.forEach((student)=>{
               if (student.email == req.body.email) {
                 throw new Error('Duplicate email found.');
               }
-              if (student.name.toLowerCase() == name) {
+              if (student.name.toLowerCase() == req.body.name.toLowerCase()) {
                 throw new Error('This name already exists in the class list.');
               }
             });
@@ -582,7 +580,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               });
 
               if (!pass) {
-                throw new Error(`Invalid email extension(s) found. Please ensure all emails are from the ${room.school}`);
+                throw new Error(`Invalid email. Please ensure all emails are from the ${req.body.school}.`);
               }
 
 
@@ -591,28 +589,15 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               const re = new RegExp(`^[\\w.]{4,25}@${extForGivenSchool}$`);
               if (!re.test(req.body.email)) {
                 //error
-                throw new Error(`Invalid email extension(s) found. Please ensure all emails are from the ${room.school}`);
+                throw new Error(`Invalid email. Please ensure all emails are from the ${req.body.school}.`);
               }
             }
 
             //
-
-            Student.find({email:req.body.email}).exec((err,student)=>{
-              if (err) next(err)
-              let addedStudent;
-              let name = req.body.name.trim().replace(/\s\s+/g,' ');
-              if (student.length > 0) {
-                addedStudent = {email:student[0].email,name:name};
-                room.students.push(addedStudent);
-              } else {
-                addedStudent = {email:req.body.email.toLowerCase(),name:name};
-                room.students.push(addedStudent);
-              }
-              room.save().then(()=>{
-                return res.json({addedStudent:addedStudent});
-              }).catch((err)=>next(err));
-
-            });
+            room.students.push({email:req.body.email,name:req.body.name});
+            room.save().then(()=>{
+              return res.json({email:req.body.email,name:req.body.name});
+            }).catch((err)=>next(err));
 
           } else {
             throw new Error('You do not have permission to modify the class list.');
@@ -639,8 +624,8 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
 
 });
 
-router.post("/status",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
-  if (val){
+router.post("/status",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
+  if (val) {
     return val.toLowerCase();
   }
 })],(req,res,next)=>{
@@ -673,31 +658,29 @@ router.post("/status",authenticated,[check('name').isLength({min:6,max:12}).with
         }
 
       });
-    } else {
-      next(err)
     }
 
   });
 
 });
 
-router.post("/ticket",authenticated,[check('title').isLength({min:10,max:150}).withMessage("Election title must be between 10-150 characters.").customSanitizer(val => {
+router.post("/ticket",authenticated,[check('title').custom(title => typeof title == "string").withMessage('Invalid format for election title.').isLength({min:10,max:150}).withMessage("Election title must be between 10-150 characters.").customSanitizer((val) => {
   if (val) {
-    return val.trim().replace(/\s\s+/g, ' ')
+    return val.trim().replace(/\s/g, ' ')
   }
 }),
 check('typeof').isIn(['stv','fpp','approval']).withMessage('Invalid election type.'),
 check('vacancies').isInt().withMessage('Vacancies must be an integer.'),
 check('urls.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.').isLength({max:500}).withMessage('URL is too large.'),
-check('restrictions').custom((resOb) => Object.prototype.toString.call(resOb) == "[object Object]").withMessage('Incorrect format detected.'),
-check('candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
-check('description').isLength({min:20,max:500}).withMessage("Description must be between 20-500 characters.").customSanitizer(val => {
+check('restrictions').custom(resOb => Object.prototype.toString.call(resOb) == "[object Object]").withMessage('Incorrect format detected.'),
+check('candidates').custom(candidates => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
+check('description').custom(description => typeof description == "string").withMessage('Invalid format for election description.').isLength({min:20,max:500}).withMessage("Description must be between 20-500 characters.").customSanitizer((val) => {
   if (val) {
-    return val.trim().replace(/\s\s+/g, ' ')
+    return val.trim().replace(/\s/g, ' ')
   }
 }),
 check('approvalRate').optional(),
-check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
+check('duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
 
 
   const errors = validationResult(req);
@@ -759,32 +742,32 @@ check('duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("Dur
 
 
 
-  return res.json({election:ticketBody});
+  return res.json({election:ticketBody,copy:ticketBody});
 
 
 
 });
 
-router.post("/submit-ticket",authenticated,[check('sheet.*.title').isLength({min:10,max:150}).withMessage("All election titles must be between 10-150 characters.").customSanitizer(val => {
+router.post("/submit-ticket",authenticated,[check('sheet.*.title').custom(title => typeof title == "string").withMessage('Invalid format for election title.').isLength({min:10,max:150}).withMessage("All election titles must be between 10-150 characters.").customSanitizer((val) => {
   if (val) {
-    return val.trim().replace(/\s\s+/g, ' ')
+    return val.trim().replace(/\s/g, ' ')
   }
 }),
-check('sheet').custom((electionSheet) => electionSheet.length < 20 && electionSheet.length > 0).withMessage('The ticket must be less than 20 elections.'),
+check('sheet').custom(sheet => Object.prototype.toString.call(sheet) == "[object Array]").withMessage('Incorrect format for election ticket.').custom(sheet => sheet.length < 20 && sheet.length > 0).withMessage('The election ticket must be less than 20 elections.'),
 check('sheet.*.links.*').optional().isURL().withMessage('Please ensure that all links are valid URLs.').matches(/^https*/).withMessage('Invalid URL. Please copy and paste entire URL.').isLength({max:500}).withMessage('URL is too large.'),
 check('sheet.*.restrictions').custom((restrictedOb) => Object.prototype.toString.call(restrictedOb) == "[object Object]").withMessage('Incorrect format.'),
 check('sheet.*.candidates').custom((candidates) => Object.prototype.toString.call(candidates) == "[object Object]" ).withMessage('Incorrect format detected.').custom((candidates) => Object.values(candidates).indexOf(true) > -1).withMessage('There must be at least 1 candidate selected to run.'),
-check('sheet.*.description').isLength({min:20,max:500}).withMessage("All descriptions must be between 20-500 characters.").customSanitizer(val => {
+check('sheet.*.description').custom(description => typeof description == "string").withMessage('Invalid format for election description.').isLength({min:20,max:500}).withMessage("All descriptions must be between 20-500 characters.").customSanitizer((val) => {
   if (val) {
-    return val.trim().replace(/\s\s+/g, ' ')
+    return val.trim().replace(/\s/g, ' ')
   }
 }),
-check('sheet.*.vacancies').matches(/^\d+$/).withMessage('Vacancies must be an integer.'),
+check('sheet.*.vacancies').isInt().withMessage('Vacancies must be an integer.'),
 check('sheet.*.type').isIn(['stv','fpp','approval']).withMessage('Not a valid election type.'),
-check('sheet.*.duration').custom((time) => time >= 0.1 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
-check('classname').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+check('sheet.*.duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.1 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
+check('classname').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer((val) => {
   if (val) {
-    return val.toLowerCase()
+    return val.toLowerCase();
   }
 })],(req,res,next)=>{
 
@@ -975,12 +958,12 @@ check('classname').isLength({min:6,max:12}).withMessage("Class name must be betw
 
 });
 
-router.post("/access-poll/:key",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/access-poll/:key",authenticated,[check('name').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val) {
     return val.toLowerCase();
   }
 }),
-check('password').isLength({min:4}).withMessage("Password must be at least 4 characters.").matches(/^[\w-]+$/).withMessage("Password must be alphanumeric. Hyphens are allowed.")],(req,res,next)=>{
+check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-]+$/).withMessage("Must contain only letters (french or english), numbers or hyphens.")],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -1174,7 +1157,7 @@ router.post("/vote",authenticated,[check('type').isIn(['stv','fpp','approval']).
 
                     } else {
                       // candidate is not legit
-                      throw new Error('Vote note submitted: candidate not found.');
+                      throw new Error('Vote note submitted because candidate not found.');
                     }
                   }
 
@@ -1593,7 +1576,7 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
                         return res.json({elections:updatedElections});
                       }).catch((err)=>next(err));
                     } else {
-                      return res.status(422).json({ errors: [{msg:"Unauthorized: incorrect password."}] });
+                      return res.status(422).json({ errors: [{msg:"Incorrect password."}] });
                     }
                   })
                 } else {
@@ -1614,18 +1597,18 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
 
 
         } else {
-          return res.status(422).json({ errors: [{msg:"Unauthorized: you do not have permission to perform this action."}] });
+          return res.status(422).json({ errors: [{msg:"You do not have permission to perform this action."}] });
         }
       });
 
 });
 
-router.post("/delete-class",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/delete-class",authenticated,[check('name').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val) {
-    return val.toLowerCase()
+    return val.toLowerCase();
   }
 }),
-check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req,res,next) => {
+check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers.")],(req,res,next) => {
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -1691,12 +1674,12 @@ check('password').isLength({min:4,max:12}).withMessage("Password must be between
 
 });
 
-router.post("/leave-class",authenticated,[check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6-12 characters.").matches(/^[\w]+$/).withMessage("Class name must be alphanumeric.").customSanitizer(val => {
+router.post("/leave-class",authenticated,[check('classname').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer(val => {
   if (val) {
-    return val.toLowerCase()
+    return val.toLowerCase();
   }
 }),
-check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[\w]+$/).withMessage("Password must be alphanumeric.")],(req,res,next)=>{
+check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers.")],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
