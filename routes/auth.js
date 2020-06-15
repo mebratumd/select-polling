@@ -104,7 +104,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
         text: `Thank you for signing up with Select Polling, ${name}. Please click the URL or copy and paste it into your browser to activate your account: ${activationLink}`, // plain text body
         html: `
         <div>
-          <h1 style="text-align:center;"><img src="https://www.selectpolling.ca/favicon.ico"> Select Polling</h1>
+          <h1 style="text-align:center;"><img height="20" width="20" src="https://www.selectpolling.ca/favicon.ico"> Select Polling</h1>
           <h2>Hi, ${name}</h2>
           <p>Thank you for signing up with <a href="https://www.selectpolling.ca/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
           If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca.</b></p><br>
