@@ -108,7 +108,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           <h2>Hi, ${name}</h2>
           <p>Thank you for signing up with <a href="https://www.selectpolling.ca/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
           If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca.</b></p><br>
-          <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>ACTIVATE</a></span>
+          <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>${activationLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not sign up with Select Polling, please disregard this message.</small>
           <div style="text-align:center;margin-top:100px;">
@@ -230,7 +230,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                         if (student) {
 
                           emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Please check your email to complete activation. If the activation email is not present in your inbox, please check junk mail.`});
+                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
                           }).catch((err) => {
                             next(err)
                           });
@@ -292,7 +292,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                     if (master) {
 
                       emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Please check your email to complete activation. If the activation email is not present in your inbox, please check junk mail.`});
+                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
                       }).catch((err) => {
                         next(err)
                       });
@@ -535,7 +535,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
     });
 
     let info = await transporter.sendMail({
-        from: '"Select Polling 📈" <noreply@selectpolling.ca>', // sender address
+        from: '"Select Polling 🗳️" <noreply@selectpolling.ca>', // sender address
         to: `${email}`, // list of receivers
         subject: "Password Reset ✔", // Subject line
         text: `Hi, ${name}. Please click the URL or copy and paste it into your browser to activate your account: ${resetLink}`, // plain text body
