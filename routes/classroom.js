@@ -15,7 +15,7 @@ const upload = multer({
   },
   limits:{
     files:1,
-    fileSize:100000
+    fileSize:500000
   }
 });
 const csv = require('fast-csv');
