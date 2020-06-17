@@ -32,7 +32,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   let currentTime = new Date().getTime();
 
-  if (req.session.loginAttempts == undefined || req.session.loginAttempts > 0 || !req.session.timeOut || req.session.timeOut < currentTime) {
+  if ((req.session.loginAttempts == undefined || req.session.loginAttempts > 0) && (!req.session.timeOut || req.session.timeOut < currentTime)) {
 
     if (req.session.timeOut) {
       delete req.session.timeOut;

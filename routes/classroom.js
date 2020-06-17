@@ -1336,7 +1336,7 @@ router.post("/expired",authenticated,(req,res,next) => {
           let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
           if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
             if (expiredElec.type == "approval" && expiredElec.vacancies == 1 && expiredElec.candidates.length == 1) {
-              if (expiredElec.canApprovalRate > expiredElec.approvalRate) {
+              if (expiredElec.canApprovalRate >= expiredElec.approvalRate) {
                 // winner
                 expiredElec.winners = expiredElec.count;
               } else {
