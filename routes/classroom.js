@@ -1838,7 +1838,6 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
           delete election.count;
           delete election.approvalRate;
           delete election.canApprovalRate;
-          delete election.winners;
         }
 
         let text = JSON.stringify(election,null,2);
