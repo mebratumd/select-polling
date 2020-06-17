@@ -970,100 +970,159 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     return res.status(422).json({ errors: errors.array() });
   }
 
-  if (req.params.key === "code") {
-    Classroom.findOne({ name:req.body.name }).populate('elections').exec((err,classroom) => {
-        if (err) next(err)
+  let currentTime = new Date().getTime();
 
-        try {
-          if (classroom) {
-            const studentIds = classroom.students.map(student => student.email);
-            if (studentIds.includes(req.user.email)) {
+  if (req.session.accessAttempts == undefined || req.session.accessAttempts > 0 || !req.session.timeOut || req.session.timeOut < currentTime) {
 
-              if (classroom.elections.length > 0) {
+    if (req.session.timeOut) {
+      delete req.session.timeOut;
+    }
 
-                const firstElection = classroom.elections.filter(el => el.status == true)[0];
-                const pass = firstElection.tokens.find((student) => {
-                  return student.email == req.user.email && student.hash == req.body.password;
-                });
+    if (req.params.key === "code") {
+      Classroom.findOne({ name:req.body.name }).populate('elections').exec((err,classroom) => {
+          if (err) next(err)
 
-                if (!pass) {
-                  throw new Error('Incorrect password.');
-                } else {
-                  Election.find({tokens: {$elemMatch : { email:req.user.email,hash:req.body.password }}}).exec((err,polls) => {
-                    if (err) next(err)
-                    if (polls) {
-                      polls.forEach((poll,idx)=>{
-                        poll.electionAccess.forEach(async function(person,i) {
-                          if (person.email == req.user.email) {
-                            poll.electionAccess.splice(i,1,{_id:person._id,email:req.user.email,permission:true});
-                            await poll.save().then(()=>{}).catch(err => next(err));
-                            if (polls.length == idx+1) {
-                              return res.json({});
-                            }
-                          }
-                        });
-                      });
-                    } else {
-                      throw new Error('Oops. Something went wrong. Please try submitting details again.');
-                    }
+          try {
+            if (classroom) {
+              const studentIds = classroom.students.map(student => student.email);
+              if (studentIds.includes(req.user.email)) {
+
+                if (classroom.elections.length > 0) {
+
+                  const firstElection = classroom.elections.filter(el => el.status == true)[0];
+                  const pass = firstElection.tokens.find((student) => {
+                    return student.email == req.user.email && student.hash == req.body.password;
                   });
+
+                  if (!pass) {
+
+                    if (req.session.accessAttempts) {
+                      req.session.accessAttempts--;
+                      if (req.session.accessAttempts == 0) {
+                        req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+                      }
+                    } else {
+                      req.session.accessAttempts = 10;
+                    }
+
+                    if (req.session.accessAttempts <= 5 && req.session.accessAttempts > 0) {
+                      return res.status(422).json({errors:[{msg:`Incorrect access code. ${req.session.accessAttempts} attempts remaining.`}]});
+                    } else if (req.session.accessAttempts == 0) {
+                      let currentTime = new Date().getTime();
+                      let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+                      let roundedRemainingTime = Math.round(remainingTime);
+                      return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
+                    } else {
+                      return res.status(422).json({errors:[{msg:'Incorrect access code.'}]});
+                    }
+
+
+                  } else {
+                    Election.find({tokens: {$elemMatch : { email:req.user.email,hash:req.body.password }}}).exec((err,polls) => {
+                      if (err) next(err)
+                      if (polls) {
+                        polls.forEach((poll,idx)=>{
+                          poll.electionAccess.forEach(async function(person,i) {
+                            if (person.email == req.user.email) {
+                              poll.electionAccess.splice(i,1,{_id:person._id,email:req.user.email,permission:true});
+                              await poll.save().then(()=>{}).catch(err => next(err));
+                              if (polls.length == idx+1) {
+                                return res.json({});
+                              }
+                            }
+                          });
+                        });
+                      } else {
+                        throw new Error('Oops. Something went wrong. Please try submitting details again.');
+                      }
+                    });
+                  }
+                } else {
+                  //
+                  throw new Error('No elections currently going on.');
                 }
+
               } else {
-                //
-                throw new Error('No elections currently going on.');
+                // student is not apart of the classroom
+                throw new Error("You cannot partake in this classroom's elections.");
+
               }
 
             } else {
-              // student is not apart of the classroom
-              throw new Error("You cannot partake in this classroom's elections.");
-
+              // classroom doesn't exist
+              throw new Error("This classroom does not exist.");
             }
-
-          } else {
-            // classroom doesn't exist
-            throw new Error("This classroom does not exist.");
+          } catch(e) {
+            return res.status(422).json({errors:[{msg:e.message}]});
           }
-        } catch(e) {
-          return res.status(422).json({errors:[{msg:e.message}]});
-        }
 
-
-      });
-  }
-
-
-  if (req.params.key == "key") {
-    bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
-      if (error) {
-        next(error);
-      }
-      if (response) {
-        Classroom.find({name:req.body.name}).populate('elections').exec((err,room)=>{
-          if (err) next(err);
-          if (room.length > 0) {
-            let valid = room[0].students.filter(student => student.email == req.user.email);
-            if (valid.length > 0) {
-              let firstElection = room[0].elections.filter(el => el.status == true)[0];
-              let token = firstElection.tokens.filter(token => token.email == req.user.email)[0];
-              if (token) {
-                return res.json({key:token.hash});
-              } else {
-                return res.status(422).json({errors:[{msg:'Cannot access this poll as you were added to the class list after the creation of the poll.'}]});
-              }
-
-            } else {
-              return res.status(422).json({errors:[{msg:'You are not apart of the class list.'}]});
-            }
-          } else {
-            return res.status(422).json({errors:[{msg:'Classroom not found.'}]});
-          }
 
         });
-      } else {
-        return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
-      }
-    });
+    }
+
+
+    if (req.params.key == "key") {
+      bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
+        if (error) {
+          next(error);
+        }
+        if (response) {
+          Classroom.find({name:req.body.name}).populate('elections').exec((err,room)=>{
+            if (err) next(err);
+            if (room.length > 0) {
+              let valid = room[0].students.filter(student => student.email == req.user.email);
+              if (valid.length > 0) {
+                let firstElection = room[0].elections.filter(el => el.status == true)[0];
+                let token = firstElection.tokens.filter(token => token.email == req.user.email)[0];
+                if (token) {
+                  return res.json({key:token.hash});
+                } else {
+                  return res.status(422).json({errors:[{msg:'Cannot access this poll as you were added to the class list after the creation of the poll.'}]});
+                }
+
+              } else {
+                return res.status(422).json({errors:[{msg:'You are not apart of the class list.'}]});
+              }
+            } else {
+              return res.status(422).json({errors:[{msg:'Classroom not found.'}]});
+            }
+
+          });
+        } else {
+          if (req.session.accessAttempts) {
+            req.session.accessAttempts--;
+            if (req.session.accessAttempts == 0) {
+              req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+            }
+          } else {
+            req.session.accessAttempts = 10;
+          }
+
+          if (req.session.accessAttempts <= 5 && req.session.accessAttempts > 0) {
+            return res.status(422).json({errors:[{msg:`Incorrect key. ${req.session.accessAttempts} attempts remaining.`}]});
+          } else if (req.session.accessAttempts == 0) {
+            let currentTime = new Date().getTime();
+            let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+            let roundedRemainingTime = Math.round(remainingTime);
+            return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
+          } else {
+            return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
+          }
+
+
+        }
+      });
+    }
+
+
+  } else {
+    let currentTime = new Date().getTime();
+    let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+    let roundedRemainingTime = Math.round(remainingTime);
+    return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
   }
+
+
 
 
 

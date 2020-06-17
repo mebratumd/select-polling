@@ -62,7 +62,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                 let currentTime = new Date().getTime();
                 let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
                 let roundedRemainingTime = Math.round(remainingTime);
-                return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
+                return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
               }
 
 
