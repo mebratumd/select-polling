@@ -56,7 +56,18 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                 req.session.loginAttempts = 5;
               }
 
-              info.message = `${info.message} ${req.session.loginAttempts} login attempts remaining.`;
+              if (req.session.loginAttempts > 0) {
+                info.message = `${info.message} ${req.session.loginAttempts} login attempts remaining.`;
+              } else {
+
+                let currentTime = new Date().getTime();
+                let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+                let roundedRemainingTime = Math.round(remainingTime);
+                return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
+
+
+              }
+
 
               return res.status(401).json({errors:[info]}); // incorrect password
             } else if (info.active == undefined) {
