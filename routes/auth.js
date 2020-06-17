@@ -329,7 +329,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 
   } else {
-    return res.status(422).json({errors:[{msg:'You\'ve already registered your account. If you have\'nt already, please activate it.'}]});
+    return res.status(422).json({errors:[{msg:'You\'ve already registered your account. If you haven\'t already, please activate it.'}]});
   }
 
 
