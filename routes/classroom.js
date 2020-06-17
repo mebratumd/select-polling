@@ -1798,7 +1798,7 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
     Election.findById(req.params.id).populate({
       path: 'class',
       select: 'name master'
-    }).select('-tokens -_id -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
+    }).select('-tokens -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
       if (err) next(err)
       if (election) {
         if (req.user.id != election.class.master) {
