@@ -1798,7 +1798,7 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
     Election.findById(req.params.id).populate({
       path: 'class',
       select: 'name master'
-    }).select('-tokens -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
+    }).select('-tokens -status -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
       if (err) next(err)
       if (election) {
         if (req.user.id != election.class.master) {
@@ -1817,9 +1817,13 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
 
         if (election.type == "approval") {
           if (election.candidates.length == 1) {
+            election.candidate_approval_rate = election.canApprovalRate;
+            election.approval_rate_for_election = election.approvalRate;
             delete election.count_STV;
             delete election.elected_STV;
             delete election.quota;
+            delete election.canApprovalRate;
+            delete election.approvalRate;
           } else {
             delete election.count_STV;
             delete election.elected_STV;
