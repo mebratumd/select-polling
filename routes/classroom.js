@@ -1830,6 +1830,11 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
         }
 
         if (election.type == "stv") {
+          election.count_before_redistribution = election.count_STV;
+          election.count_after_redistritbution = election.elected_STV;
+          election.winners = election.elected_STV.filter(can => can.quota > 0);
+          delete election.count_STV;
+          delete election.elected_STV;
           delete election.count;
           delete election.approvalRate;
           delete election.canApprovalRate;
