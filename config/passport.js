@@ -10,7 +10,7 @@ module.exports = (passport) => {
       Student.findOne({ username: username.toLowerCase() }, (err, user) => {
         if (err) { return done(err); }
         if (!user) {
-          return done(null, false, { message: 'This user does not exist.',active:true }); //
+          return done(null, false, { message: 'This user does not exist.',active:undefined }); //
         } else {
           if (user.active) {
             bcrypt.compare(password, user.password, (err, res) => {
