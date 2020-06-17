@@ -1275,216 +1275,190 @@ router.post("/expired",authenticated,(req,res,next) => {
         for(let i=0;i<ids.length;i++) {
           let expiredElec = await Election.findById(ids[i]).exec();
           let expiredElecClass = await Classroom.findById(expiredElec.class).populate({path:'elections',options:{sort:{'date':1}}}).exec();
-          if (expiredElecClass.master == req.user.id) {
-            if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
-              if (expiredElec.type == "approval" && expiredElec.vacancies == 1 && expiredElec.candidates.length == 1) {
-                if (expiredElec.canApprovalRate > expiredElec.approvalRate) {
-                  // winner
-                  expiredElec.winners = expiredElec.count;
-                } else {
-                  // loser
-                  expiredElec.winners = [];
-                }
-
-                const start = new Date(expiredElec.date).getTime();
-                const duration = expiredElec.duration * 3600000;
-                const expiration = start + duration;
-                const current = new Date().getTime();
-                const expired = current < expiration ? false : true;
-                if (expired && expiredElec.status) {
-                  expiredElec.status = false;
-                  expiredElec.electionAccess = undefined;
-                  expiredElec.voteStatus = undefined;
-                  await expiredElec.save();
-                } else {
-                  throw new Error();
-                }
-
+          if (expiredElec.type == "fpp" || expiredElec.type == "approval") {
+            if (expiredElec.type == "approval" && expiredElec.vacancies == 1 && expiredElec.candidates.length == 1) {
+              if (expiredElec.canApprovalRate > expiredElec.approvalRate) {
+                // winner
+                expiredElec.winners = expiredElec.count;
               } else {
-                let countObjectArr = _.shuffle([...expiredElec.count]);
-                let winners = [];
-                for(let x=0;x<expiredElec.vacancies;x++) {
-                  let maxVal = _.max(countObjectArr,(candidate)=>{
-                    return candidate.votes
-                  });
-                  winners.push(maxVal);
-                  countObjectArr.splice(countObjectArr.indexOf(maxVal),1);
-                }
-
-                expiredElec.winners = winners;
-                const start = new Date(expiredElec.date).getTime();
-                const duration = expiredElec.duration * 3600000;
-                const expiration = start + duration;
-                const current = new Date().getTime();
-                const expired = current < expiration ? false : true;
-                if (expired && expiredElec.status) {
-                  expiredElec.status = false;
-                  expiredElec.electionAccess = undefined;
-                  expiredElec.voteStatus = undefined;
-                  await expiredElec.save();
-                } else {
-                  throw new Error();
-                }
-
-
+                // loser
+                expiredElec.winners = [];
               }
 
-            } else if (expiredElec.type == "stv") {
-              let expiredElec_ = await Election.findById(ids[i]).exec();
-              expiredElec_.count_STV.sort((a,b)=>{
-                return b.total - a.total;
-              });
-              const start = new Date(expiredElec_.date).getTime();
-              const duration = expiredElec_.duration * 3600000;
+              const start = new Date(expiredElec.date).getTime();
+              const duration = expiredElec.duration * 3600000;
               const expiration = start + duration;
               const current = new Date().getTime();
               const expired = current < expiration ? false : true;
-              if (expired && expiredElec_.status) {
-                let exceededThreshold = [];
-                let eliminated = [];
-                let elected = [];
-                let roundedQuota = Math.floor(expiredElec_.quota);
+              if (expired && expiredElec.status) {
+                expiredElec.status = false;
+                expiredElec.electionAccess = undefined;
+                expiredElec.voteStatus = undefined;
+                await expiredElec.save();
+              } else {
+                throw new Error();
+              }
+
+            } else {
+              let countObjectArr = _.shuffle([...expiredElec.count]);
+              let winners = [];
+              for(let x=0;x<expiredElec.vacancies;x++) {
+                let maxVal = _.max(countObjectArr,(candidate)=>{
+                  return candidate.votes
+                });
+                winners.push(maxVal);
+                countObjectArr.splice(countObjectArr.indexOf(maxVal),1);
+              }
+
+              expiredElec.winners = winners;
+              const start = new Date(expiredElec.date).getTime();
+              const duration = expiredElec.duration * 3600000;
+              const expiration = start + duration;
+              const current = new Date().getTime();
+              const expired = current < expiration ? false : true;
+              if (expired && expiredElec.status) {
+                expiredElec.status = false;
+                expiredElec.electionAccess = undefined;
+                expiredElec.voteStatus = undefined;
+                await expiredElec.save();
+              } else {
+                throw new Error();
+              }
+
+
+            }
+
+          } else if (expiredElec.type == "stv") {
+            let expiredElec_ = await Election.findById(ids[i]).exec();
+            expiredElec_.count_STV.sort((a,b)=>{
+              return b.total - a.total;
+            });
+            const start = new Date(expiredElec_.date).getTime();
+            const duration = expiredElec_.duration * 3600000;
+            const expiration = start + duration;
+            const current = new Date().getTime();
+            const expired = current < expiration ? false : true;
+            if (expired && expiredElec_.status) {
+              let exceededThreshold = [];
+              let eliminated = [];
+              let elected = [];
+              let roundedQuota = Math.floor(expiredElec_.quota);
+
+              expiredElec_.count_STV.forEach((student)=>{
+                if (student.ranks.length > roundedQuota) {
+                  exceededThreshold.push(student._id.toString());
+                  elected.push({quota:roundedQuota,_id:student._id.toString()});
+                }
+              });
+
+              if (elected.length >= expiredElec_.vacancies) {
+                // done
+                let losers = [];
+                expiredElec_.candidates.forEach((can)=>{
+                  if (exceededThreshold.indexOf(can._id.toString()) == -1) {
+                    losers.push({quota:0,_id:can._id.toString()});
+                  };
+                });
+                let elected_all = elected.concat(losers);
+                elected_all.forEach((ob)=>{
+                  expiredElecClass.students.forEach((student)=>{
+                    if (student._id.toString() == ob._id) {
+                      ob['name'] = student.name;
+                    }
+                  })
+                })
+                expiredElec_.status = false;
+                expiredElec_.elected_STV = elected_all;
+                expiredElec_.electionAccess = undefined;
+                expiredElec_.voteStatus = undefined;
+                await expiredElec_.save();
+
+              } else {
+                elected = [];
+                exceededThreshold = [];
 
                 expiredElec_.count_STV.forEach((student)=>{
                   if (student.ranks.length > roundedQuota) {
                     exceededThreshold.push(student._id.toString());
                     elected.push({quota:roundedQuota,_id:student._id.toString()});
+                    let slice = student.ranks.length - roundedQuota
+                    let excessVotes = _.sample(student.ranks,slice);
+                    excessVotes.forEach((excess)=>{
+                      excess.shift();
+                      let followingRanked = excess[0];
+                      expiredElec_.count_STV.forEach((candidate) => {
+                        if (candidate._id.toString() == followingRanked) {
+                          candidate.ranks.push(excess);
+                        }
+                      })
+                    });
                   }
                 });
 
-                if (elected.length >= expiredElec_.vacancies) {
-                  // done
-                  let losers = [];
-                  expiredElec_.candidates.forEach((can)=>{
-                    if (exceededThreshold.indexOf(can._id.toString()) == -1) {
-                      losers.push({quota:0,_id:can._id.toString()});
-                    };
-                  });
-                  let elected_all = elected.concat(losers);
-                  elected_all.forEach((ob)=>{
-                    expiredElecClass.students.forEach((student)=>{
-                      if (student._id.toString() == ob._id) {
-                        ob['name'] = student.name;
-                      }
-                    })
-                  })
-                  expiredElec_.status = false;
-                  expiredElec_.elected_STV = elected_all;
-                  expiredElec_.electionAccess = undefined;
-                  expiredElec_.voteStatus = undefined;
-                  await expiredElec_.save();
+                await expiredElec_.save();
+                // not enough votes
+                let expiredElec__ = await Election.findById(ids[i]).exec();
+                if (elected.length < expiredElec__.vacancies) {
 
-                } else {
-                  elected = [];
-                  exceededThreshold = [];
+                  try {
 
-                  expiredElec_.count_STV.forEach((student)=>{
-                    if (student.ranks.length > roundedQuota) {
-                      exceededThreshold.push(student._id.toString());
-                      elected.push({quota:roundedQuota,_id:student._id.toString()});
-                      let slice = student.ranks.length - roundedQuota
-                      let excessVotes = _.sample(student.ranks,slice);
-                      excessVotes.forEach((excess)=>{
-                        excess.shift();
-                        let followingRanked = excess[0];
-                        expiredElec_.count_STV.forEach((candidate) => {
-                          if (candidate._id.toString() == followingRanked) {
-                            candidate.ranks.push(excess);
-                          }
-                        })
-                      });
-                    }
-                  });
+                    expiredElec__.count_STV = _.shuffle(expiredElec__.count_STV);
 
-                  await expiredElec_.save();
-                  // not enough votes
-                  let expiredElec__ = await Election.findById(ids[i]).exec();
-                  if (elected.length < expiredElec__.vacancies) {
+                    expiredElec__.count_STV.sort((a,b)=>{
+                      return a.total - b.total;
+                    }).forEach((student,index)=>{
 
-                    try {
+                      if (exceededThreshold.indexOf(student._id.toString()) == -1 && index+1 <= expiredElec__.candidates.length - expiredElec__.vacancies) {
 
-                      expiredElec__.count_STV = _.shuffle(expiredElec__.count_STV);
+                        eliminated.push(student._id.toString());
 
-                      expiredElec__.count_STV.sort((a,b)=>{
-                        return a.total - b.total;
-                      }).forEach((student,index)=>{
-
-                        if (exceededThreshold.indexOf(student._id.toString()) == -1 && index+1 <= expiredElec__.candidates.length - expiredElec__.vacancies) {
-
-                          eliminated.push(student._id.toString());
-
-                          student.ranks.forEach((voteList)=>{
-                            voteList.shift();
-                            for(let i=0;i<voteList.length;i++){
-                              try {
-                                expiredElec__.count_STV.forEach((candidate)=>{
-                                  if (candidate._id.toString() == voteList[i] && exceededThreshold.indexOf(voteList[i]) == -1 && eliminated.indexOf(voteList[i]) == -1) {
-                                    candidate.ranks.push(voteList);
-                                    throw new Error();
-                                  }
-                                })
-                              } catch(e) {
-                                break;
-                              }
-
+                        student.ranks.forEach((voteList)=>{
+                          voteList.shift();
+                          for(let i=0;i<voteList.length;i++){
+                            try {
+                              expiredElec__.count_STV.forEach((candidate)=>{
+                                if (candidate._id.toString() == voteList[i] && exceededThreshold.indexOf(voteList[i]) == -1 && eliminated.indexOf(voteList[i]) == -1) {
+                                  candidate.ranks.push(voteList);
+                                  throw new Error();
+                                }
+                              })
+                            } catch(e) {
+                              break;
                             }
 
-                          });
-                          // see if anyone hit quota
-                          expiredElec__.count_STV.forEach((student_)=>{
-                              if (student_.ranks.length > roundedQuota && exceededThreshold.indexOf(student_._id.toString()) == -1) {
-                                elected.push({quota:roundedQuota,_id:student_._id.toString()});
-                                exceededThreshold.push(student_._id.toString());
-                              }
-                          });
-
-                          // check to see if there are remaining vacancies
-
-                          if (elected.length >= expiredElec__.vacancies) {
-                            throw new Error();
                           }
 
-                        } else {
-                          if (exceededThreshold.indexOf(student._id.toString()) == -1) {
-                            elected.push({quota:roundedQuota,_id:student._id.toString()});
-                            exceededThreshold.push(student._id.toString());
-                          }
-                          if (index+1 == expiredElec__.candidates.length) {
-                            throw new Error();
-                          }
+                        });
+                        // see if anyone hit quota
+                        expiredElec__.count_STV.forEach((student_)=>{
+                            if (student_.ranks.length > roundedQuota && exceededThreshold.indexOf(student_._id.toString()) == -1) {
+                              elected.push({quota:roundedQuota,_id:student_._id.toString()});
+                              exceededThreshold.push(student_._id.toString());
+                            }
+                        });
+
+                        // check to see if there are remaining vacancies
+
+                        if (elected.length >= expiredElec__.vacancies) {
+                          throw new Error();
                         }
 
+                      } else {
+                        if (exceededThreshold.indexOf(student._id.toString()) == -1) {
+                          elected.push({quota:roundedQuota,_id:student._id.toString()});
+                          exceededThreshold.push(student._id.toString());
+                        }
+                        if (index+1 == expiredElec__.candidates.length) {
+                          throw new Error();
+                        }
+                      }
 
 
 
-                      });
 
-                    } catch(e) {
-                      // done
-                      let losers = [];
-                      expiredElec__.candidates.forEach((can)=>{
-                        if (exceededThreshold.indexOf(can._id.toString()) == -1) {
-                          losers.push({quota:0,_id:can._id.toString()});
-                        };
-                      });
-                      let elected_all = elected.concat(losers);
-                      elected_all.forEach((ob)=>{
-                        expiredElecClass.students.forEach((student)=>{
-                          if (student._id.toString() == ob._id) {
-                            ob['name'] = student.name;
-                          }
-                        })
-                      });
+                    });
 
-                      expiredElec__.status = false;
-                      expiredElec__.elected_STV = elected_all;
-                      expiredElec__.electionAccess = undefined;
-                      expiredElec__.voteStatus = undefined;
-                      await expiredElec__.save();
-
-                    }
-
-                  } else {
+                  } catch(e) {
                     // done
                     let losers = [];
                     expiredElec__.candidates.forEach((can)=>{
@@ -1499,7 +1473,8 @@ router.post("/expired",authenticated,(req,res,next) => {
                           ob['name'] = student.name;
                         }
                       })
-                    })
+                    });
+
                     expiredElec__.status = false;
                     expiredElec__.elected_STV = elected_all;
                     expiredElec__.electionAccess = undefined;
@@ -1508,20 +1483,39 @@ router.post("/expired",authenticated,(req,res,next) => {
 
                   }
 
+                } else {
+                  // done
+                  let losers = [];
+                  expiredElec__.candidates.forEach((can)=>{
+                    if (exceededThreshold.indexOf(can._id.toString()) == -1) {
+                      losers.push({quota:0,_id:can._id.toString()});
+                    };
+                  });
+                  let elected_all = elected.concat(losers);
+                  elected_all.forEach((ob)=>{
+                    expiredElecClass.students.forEach((student)=>{
+                      if (student._id.toString() == ob._id) {
+                        ob['name'] = student.name;
+                      }
+                    })
+                  })
+                  expiredElec__.status = false;
+                  expiredElec__.elected_STV = elected_all;
+                  expiredElec__.electionAccess = undefined;
+                  expiredElec__.voteStatus = undefined;
+                  await expiredElec__.save();
+
                 }
 
-
-
-
-              } else {
-                // poll has already been closed and expired
-                throw new Error();
               }
-            }
 
-          } else {
-            // do not have permission to expire elections
-            throw new Error();
+
+
+
+            } else {
+              // poll has already been closed and expired
+              throw new Error();
+            }
           }
 
         }
