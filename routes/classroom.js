@@ -1792,5 +1792,78 @@ router.get("/permission/:id",(req,res,next)=>{
 
 });
 
+router.get("/download/:id",authenticated,(req,res,next)=>{
+
+  if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+    Election.findById(req.params.id).populate({
+      path: 'class',
+      select: 'name master'
+    }).select('-tokens -_id -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
+      if (err) next(err)
+      if (election) {
+        if (req.user.id != election.class.master) {
+          return res.status(401).json({errors:[{msg:'You do not have permission to perform this action.'}]});
+        }
+
+        delete election.class.master;
+        delete election.class._id;
+
+        if (election.type == "fpp") {
+          delete election.count_STV;
+          delete election.elected_STV;
+          delete election.canApprovalRate;
+          delete election.quota;
+        }
+
+        if (election.type == "approval") {
+          if (election.candidates.length == 1) {
+            delete election.count_STV;
+            delete election.elected_STV;
+            delete election.quota;
+          } else {
+            delete election.count_STV;
+            delete election.elected_STV;
+            delete election.approvalRate;
+            delete election.canApprovalRate;
+            delete election.quota;
+          }
+        }
+
+        if (election.type == "stv") {
+          delete election.count;
+          delete election.approvalRate;
+          delete election.canApprovalRate;
+          delete election.winners;
+        }
+
+        let text = JSON.stringify(election,null,2);
+
+        fs.writeFile(`./elections/${election._id}-${election.class.name}.txt`,text,(err)=>{
+          if (err) next(err)
+
+          res.download(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
+            if (err) next(err)
+
+            fs.unlink(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
+              if (err) console.log(err)
+            });
+
+          });
+
+        });
+
+      } else {
+        return res.status(422).json({errors:[{msg:'This election does not exist.'}]});
+      }
+    })
+  } else {
+    return res.status(422).json({errors:[{msg:'Invalid election ID.'}]});
+  }
+
+
+
+
+})
+
 
 module.exports = router;
