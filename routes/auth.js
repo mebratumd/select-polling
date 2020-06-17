@@ -30,28 +30,60 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     return res.status(422).json({ errors: errors.array() });
   }
 
-  request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
-    if (JSON.parse(body).score <= 0.3) {
-      return res.status(422).json({errors:[{msg:'Something wrong.'}]});
-    } else {
-      passport.authenticate('local', (err, user, info) => {
-        if (err) { return next(err); }
-        if (!user) {
-          if (info.active) {
-            return res.status(401).json({errors:[info]}); // incorrect password or user doesn't exist
-          } else {
-            return res.status(423).send(info.message); // activate your account
-          }
-        }
-        req.logIn(user, (err) => {
-          if (err) { return next(err); }
-          return res.json({});
-        });
-      })(req, res, next);
+  let currentTime = new Date().getTime();
 
+  if (!req.session.loginAttempts || req.session.loginAttempts > 0 || !req.session.timeOut || req.session.timeOut < currentTime) {
+
+    if (req.session.timeOut) {
+      delete req.session.timeOut;
     }
 
-  });
+    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+      if (JSON.parse(body).score <= 0.3) {
+        return res.status(422).json({errors:[{msg:'Something wrong.'}]});
+      } else {
+        passport.authenticate('local', (err, user, info) => {
+          if (err) { return next(err); }
+          if (!user) {
+            if (info.active) {
+
+              if (req.session.loginAttempts) {
+                req.session.loginAttempts--;
+                if (req.session.loginAttempts == 0) {
+                  req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+                }
+              } else {
+                req.session.loginAttempts = 5;
+              }
+
+              info.message = `${info.message} ${req.session.loginAttempts} login attempts remaining.`;
+
+              return res.status(401).json({errors:[info]}); // incorrect password
+            } else if (info.active == undefined) {
+              return res.status(401).json({errors:[info]}); // user does not exist
+            } else {
+              return res.status(423).send(info.message); // activate your account
+            }
+          }
+          req.logIn(user, (err) => {
+            if (err) { return next(err); }
+            delete req.session.loginAttempts;
+            return res.json({});
+          });
+        })(req, res, next);
+
+      }
+
+    });
+
+  } else {
+    let currentTime = new Date().getTime();
+    let remainingTime = ( ( req.session.timeOut - currentTime ) * 3600000 ) * 60;
+    let roundedRemainingTime = Math.round(remainingTime);
+    return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
+  }
+
+
 
 
 });
