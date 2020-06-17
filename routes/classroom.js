@@ -1837,14 +1837,14 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
         }
 
         let text = JSON.stringify(election,null,2);
-        let path_ = path.join(__dirname,'elections',`${election._id}-${election.class.name}.txt`)
-        fs.writeFile(path_,text,(err)=>{
+
+        fs.writeFile(`../elections/${election._id}-${election.class.name}.txt`,text,(err)=>{
           if (err) next(err)
 
-          res.download(path_,(err)=>{
+          res.download(`../elections/${election._id}-${election.class.name}.txt`,(err)=>{
             if (err) next(err)
 
-            fs.unlink(path_,(err)=>{
+            fs.unlink(`../elections/${election._id}-${election.class.name}.txt`,(err)=>{
               if (err) console.log(err)
             });
 
