@@ -1805,8 +1805,10 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
           return res.status(401).json({errors:[{msg:'You do not have permission to perform this action.'}]});
         }
 
+        election.total_votes = election.total;
         delete election.class.master;
         delete election.class._id;
+        delete election.total;
 
         if (election.type == "fpp") {
           delete election.count_STV;
