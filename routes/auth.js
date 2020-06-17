@@ -123,203 +123,216 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   }
 
-  let p = new Promise((resolve,reject)=>{
-    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
-        let json = JSON.parse(body);
-        if (json.success) {
-          if (json.score <= 0.3) {
-            reject();
+  if (!req.session.registered) {
+
+
+    let p = new Promise((resolve,reject)=>{
+      request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+          let json = JSON.parse(body);
+          if (json.success) {
+            if (json.score <= 0.3) {
+              reject();
+            } else {
+              resolve();
+            }
           } else {
-            resolve();
+            reject();
           }
-        } else {
-          reject();
-        }
-    });
-  });
-
-  // school extensions added here
-  const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
-
-  p.then(()=>{
-    if (typeof schoolExtensions[req.body.school] == "object") {
-      validEmail = schoolExtensions[req.body.school].some((extension)=>{
-        const re = new RegExp(`${extension}$`);
-        return re.test(req.body.email);
       });
-    } else {
-      const re = new RegExp(`${schoolExtensions[req.body.school]}$`);
-      validEmail = re.test(req.body.email);
-    }
+    });
 
-    if (!validEmail) {
-      return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
-    }
+    // school extensions added here
+    const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
 
-    if (req.body.status == "yes") {
-      if (req.body.electionKey) {
-        const re = new RegExp('^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$');
-
-        if(!re.test(req.body.electionKey)) {
-          return res.status(422).json({errors:[{msg:`Election key must contain only letters (french or english), or numbers.`}]});
-        }
-
-        if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
-          return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
-        }
-
-        if (req.body.electionKey != req.body.cElectionKey) {
-          return res.status(422).json({errors:[{msg:'Election keys do not match.'}]});
-        }
-
+    p.then(()=>{
+      if (typeof schoolExtensions[req.body.school] == "object") {
+        validEmail = schoolExtensions[req.body.school].some((extension)=>{
+          const re = new RegExp(`${extension}$`);
+          return re.test(req.body.email);
+        });
       } else {
-        return res.status(422).json({errors:[{msg:`Missing election key.`}]});
+        const re = new RegExp(`${schoolExtensions[req.body.school]}$`);
+        validEmail = re.test(req.body.email);
       }
 
-    }
+      if (!validEmail) {
+        return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
+      }
 
-    Student.find({ username: req.body.username }, (error,student) => {
-      if (error) throw new Error(error)
+      if (req.body.status == "yes") {
+        if (req.body.electionKey) {
+          const re = new RegExp('^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$');
 
-      if (student.length == 0) {
+          if(!re.test(req.body.electionKey)) {
+            return res.status(422).json({errors:[{msg:`Election key must contain only letters (french or english), or numbers.`}]});
+          }
 
-        if (req.body.status == 'yes') {
+          if (req.body.electionKey.length > 20 || req.body.electionKey < 6) {
+            return res.status(422).json({errors:[{msg:`Election key must be between 6-20 characters.`}]});
+          }
 
-          bcrypt.genSalt(10, (error,salt)=>{
+          if (req.body.electionKey != req.body.cElectionKey) {
+            return res.status(422).json({errors:[{msg:'Election keys do not match.'}]});
+          }
 
-            if (error) throw new Error(error)
+        } else {
+          return res.status(422).json({errors:[{msg:`Missing election key.`}]});
+        }
 
-            bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
+      }
+
+      Student.find({ username: req.body.username }, (error,student) => {
+        if (error) throw new Error(error)
+
+        if (student.length == 0) {
+
+          if (req.body.status == 'yes') {
+
+            bcrypt.genSalt(10, (error,salt)=>{
 
               if (error) throw new Error(error)
 
-              Student.find({ email: req.body.email }, (error,student)=>{
+              bcrypt.hash(req.body.electionKey,salt,(error,electionKeyHash)=>{
 
                 if (error) throw new Error(error)
 
-                if (student.length == 0) {
+                Student.find({ email: req.body.email }, (error,student)=>{
 
-                  bcrypt.genSalt(10, (err, salt_) => {
+                  if (error) throw new Error(error)
 
-                    if (err) throw new Error(err)
+                  if (student.length == 0) {
 
-                    bcrypt.hash(req.body.password, salt_, (err, passwordHash) => {
+                    bcrypt.genSalt(10, (err, salt_) => {
 
                       if (err) throw new Error(err)
 
-                      let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
-                      let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
-                      const newStudent = new Student({
-                        username: req.body.username,
-                        firstname: firstname,
-                        lastname: lastname,
-                        email: req.body.email,
-                        password: passwordHash,
-                        hash: uuidv4(),
-                        school: req.body.school,
-                        active: false,
-                        status: true,
-                        registered: new Date(),
-                        delete: new Date(),
-                        key:electionKeyHash
+                      bcrypt.hash(req.body.password, salt_, (err, passwordHash) => {
+
+                        if (err) throw new Error(err)
+
+                        let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
+                        let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
+                        const newStudent = new Student({
+                          username: req.body.username,
+                          firstname: firstname,
+                          lastname: lastname,
+                          email: req.body.email,
+                          password: passwordHash,
+                          hash: uuidv4(),
+                          school: req.body.school,
+                          active: false,
+                          status: true,
+                          registered: new Date(),
+                          delete: new Date(),
+                          key:electionKeyHash
+                        });
+
+                        newStudent.save((error,student)=>{
+                          if (error) throw new Error(error)
+
+                          if (student) {
+
+                            req.session.registered = true;
+                            emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
+                              return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
+                            }).catch((err) => {
+                              next(err)
+                            });
+
+
+                          } else {
+                            return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
+                          }
+                        });
+
+
                       });
-
-                      newStudent.save((error,student)=>{
-                        if (error) throw new Error(error)
-
-                        if (student) {
-
-                          emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
-                            return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
-                          }).catch((err) => {
-                            next(err)
-                          });
-
-
-                        } else {
-                          return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
-                        }
-                      });
-
-
                     });
-                  });
 
-                } else {
-                  return res.status(422).json({errors:[{msg:"This email is already in use."}]});
-                }
+                  } else {
+                    return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+                  }
+                });
+
               });
+            })
 
+
+
+
+          } else {
+
+            Student.find({ email:req.body.email }, (error,student)=>{
+              if (error) throw new Error(error)
+
+              if (student.length == 0) {
+
+                bcrypt.genSalt(10, (err,salt) => {
+                  if (err) throw new Error(error)
+
+                  bcrypt.hash(req.body.password, salt, (err, hash) => {
+
+                    if (err) throw new Error(err)
+
+                    let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
+                    let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
+                    const newMaster = new Student({
+                      username: req.body.username,
+                      firstname: firstname,
+                      lastname: lastname,
+                      email: req.body.email,
+                      password: hash,
+                      school: req.body.school,
+                      status: false,
+                      hash:uuidv4(),
+                      active:false,
+                      registered: new Date(),
+                      delete: new Date()
+                    });
+
+                    newMaster.save((error,master)=>{
+                      if (error) throw new Error(error)
+
+                      if (master) {
+                        req.session.registered = true;
+                        emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
+                          return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
+                        }).catch((err) => {
+                          next(err)
+                        });
+
+
+                      } else {
+                        return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
+                      }
+                    });
+
+                  });
+                });
+
+              } else {
+                return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+              }
             });
-          })
-
-
-
+          }
 
         } else {
-
-          Student.find({ email:req.body.email }, (error,student)=>{
-            if (error) throw new Error(error)
-
-            if (student.length == 0) {
-
-              bcrypt.genSalt(10, (err,salt) => {
-                if (err) throw new Error(error)
-
-                bcrypt.hash(req.body.password, salt, (err, hash) => {
-
-                  if (err) throw new Error(err)
-
-                  let firstname = req.body.firstname.replace(/^./,req.body.firstname[0].toUpperCase());
-                  let lastname = req.body.lastname.replace(/^./,req.body.lastname[0].toUpperCase());
-                  const newMaster = new Student({
-                    username: req.body.username,
-                    firstname: firstname,
-                    lastname: lastname,
-                    email: req.body.email,
-                    password: hash,
-                    school: req.body.school,
-                    status: false,
-                    hash:uuidv4(),
-                    active:false,
-                    registered: new Date(),
-                    delete: new Date()
-                  });
-
-                  newMaster.save((error,master)=>{
-                    if (error) throw new Error(error)
-
-                    if (master) {
-
-                      emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                        return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
-                      }).catch((err) => {
-                        next(err)
-                      });
-
-
-                    } else {
-                      return res.status(422).json({errors:[{msg:"Try submiting your details again."}]});
-                    }
-                  });
-
-                });
-              });
-
-            } else {
-              return res.status(422).json({errors:[{msg:"This email is already in use."}]});
-            }
-          });
+          return res.status(422).json({errors:[{msg:"This username already exists. Try another one."}]});
         }
+      });
 
-      } else {
-        return res.status(422).json({errors:[{msg:"This username already exists. Try another one."}]});
-      }
+    }).catch((e)=>{
+      next(e)
     });
 
-  }).catch((e)=>{
-    next(e)
-  });
+
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'You\'ve already registered.'}]});
+  }
+
+
 
 });
 
