@@ -34,8 +34,9 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   let person = req.body.username.toLowerCase();
   if ((req.session[person] == undefined || req.session[person] > 0) && (!req.session[`${person}_timeOut`] || req.session[`${person}_timeOut`] < currentTime)) {
 
-    if (req.session[`${person}_timeOut`]) {
+    if (req.session[`${person}_timeOut`] < currentTime) {
       delete req.session[`${person}_timeOut`];
+      delete req.session[person];
     }
 
 
