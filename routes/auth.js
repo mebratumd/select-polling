@@ -31,11 +31,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   }
 
   let currentTime = new Date().getTime();
-  let username = req.body.username.toLowerCase();
-  if ((req.session[username] == undefined || req.session[username] > 0) && (!req.session[`${username}_timeOut`] || req.session[`${username}_timeOut`] < currentTime)) {
+  let person = req.body.username.toLowerCase();
+  if ((req.session[person] == undefined || req.session[person] > 0) && (!req.session[`${person}_timeOut`] || req.session[`${person}_timeOut`] < currentTime)) {
 
-    if (req.session[`${username}_timeOut`]) {
-      delete req.session[`${username}_timeOut`];
+    if (req.session[`${person}_timeOut`]) {
+      delete req.session[`${person}_timeOut`];
     }
 
     console.log(req.session);
@@ -49,20 +49,20 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           if (!user) {
             if (info.active) {
 
-              if (req.session[username]) {
-                req.session[username]--;
-                if (req.session[username] == 0) {
-                  req.session[`${username}_timeOut`] = new Date().getTime() + 600000; // 10 min lock out
+              if (req.session[person]) {
+                req.session[person]--;
+                if (req.session[person] == 0) {
+                  req.session[`${person}_timeOut`] = new Date().getTime() + 600000; // 10 min lock out
                 }
               } else {
-                req.session[username] = 10;
+                req.session[person] = 10;
               }
 
-              if (req.session[username] <= 5 && req.session[username] > 0) {
-                info.message = `${info.message} ${req.session[username]} login attempts remaining.`;
-              } else if (req.session[username] == 0) {
+              if (req.session[person] <= 5 && req.session[person] > 0) {
+                info.message = `${info.message} ${req.session[person]} login attempts remaining.`;
+              } else if (req.session[person] == 0) {
                 let currentTime = new Date().getTime();
-                let remainingTime = ( ( req.session[`${username}_timeOut`] - currentTime ) / 3600000 ) * 60;
+                let remainingTime = ( ( req.session[`${person}_timeOut`] - currentTime ) / 3600000 ) * 60;
                 let roundedRemainingTime = Math.round(remainingTime);
                 return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
               } else {
@@ -78,7 +78,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           }
           req.logIn(user, (err) => {
             if (err) { return next(err); }
-            delete req.session[username];
+            delete req.session[person];
             return res.json({});
           });
         })(req, res, next);
@@ -89,7 +89,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   } else {
     let currentTime = new Date().getTime();
-    let remainingTime = ( ( req.session[`${username}_timeOut`] - currentTime ) / 3600000 ) * 60;
+    let remainingTime = ( ( req.session[`${person}_timeOut`] - currentTime ) / 3600000 ) * 60;
     let roundedRemainingTime = Math.round(remainingTime);
     return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
   }
