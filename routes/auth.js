@@ -24,7 +24,7 @@ router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Us
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
-
+  console.log(req.session);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
@@ -38,7 +38,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       delete req.session[`${person}_timeOut`];
     }
 
-    console.log(req.session);
+
 
     request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
       if (JSON.parse(body).score <= 0.3) {
