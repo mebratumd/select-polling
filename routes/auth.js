@@ -38,6 +38,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       delete req.session[`${username}_timeOut`];
     }
 
+    console.log(req.session);
+
     request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
       if (JSON.parse(body).score <= 0.3) {
         return res.status(422).json({errors:[{msg:'Something wrong.'}]});
