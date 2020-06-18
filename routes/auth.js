@@ -24,7 +24,7 @@ router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Us
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
-  console.log(req.session);
+  //console.log(req.session);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
@@ -66,7 +66,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                 let roundedRemainingTime = Math.round(remainingTime);
                 return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
               }
-              
+
               return res.status(401).json({errors:[info]}); // incorrect password
 
             } else if (info.active == undefined) {
