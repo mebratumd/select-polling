@@ -65,10 +65,9 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                 let remainingTime = ( ( req.session[`${person}_timeOut`] - currentTime ) / 3600000 ) * 60;
                 let roundedRemainingTime = Math.round(remainingTime);
                 return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
-              } else {
-                return res.status(401).json({errors:[info]}); // incorrect password
               }
-
+              
+              return res.status(401).json({errors:[info]}); // incorrect password
 
             } else if (info.active == undefined) {
               return res.status(401).json({errors:[info]}); // user does not exist
@@ -76,11 +75,13 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
               return res.status(423).send(info.message); // activate your account
             }
           }
+
           req.logIn(user, (err) => {
             if (err) { return next(err); }
             delete req.session[person];
             return res.json({});
           });
+
         })(req, res, next);
 
       }
