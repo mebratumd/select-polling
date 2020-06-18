@@ -8,24 +8,18 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoStore = require('connect-mongo')(session);
 const path = require('path');
-const rateLimit = require("express-rate-limit");
 const Election = require('./models/election.js');
 const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
 
-//require('dotenv').config();
+require('dotenv').config();
 
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
 app.use(require('prerender-node'));
-
-const classLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 100
-});
 
 
 require('./config/passport.js')(passport);
@@ -68,8 +62,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(passport.initialize());
 app.use(passport.session());
-app.set('trust proxy', true);
-app.use("/",classLimiter);
+
 app.use("/", auth);
 app.use("/class",classroom);
 
