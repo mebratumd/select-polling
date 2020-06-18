@@ -972,10 +972,10 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
   let currentTime = new Date().getTime();
 
-  if (req.session.accessAttempts == undefined || req.session.accessAttempts > 0 || !req.session.timeOut || req.session.timeOut < currentTime) {
+  if (req.session.accessAttempts[req.user.username] == undefined || req.session.accessAttempts[req.user.username] > 0 || !req.session.timeOut[req.user.username] || req.session.timeOut[req.user.username] < currentTime) {
 
     if (req.session.timeOut) {
-      delete req.session.timeOut;
+      delete req.session.timeOut[req.user.username];
     }
 
     if (req.params.key === "code") {
@@ -996,20 +996,20 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
                   if (!pass) {
 
-                    if (req.session.accessAttempts) {
-                      req.session.accessAttempts--;
-                      if (req.session.accessAttempts == 0) {
-                        req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+                    if (req.session.accessAttempts[req.user.username]) {
+                      req.session.accessAttempts[req.user.username]--;
+                      if (req.session.accessAttempts[req.user.username] == 0) {
+                        req.session.timeOut[req.user.username] = new Date().getTime() + 600000; // 10 min lock out
                       }
                     } else {
-                      req.session.accessAttempts = 10;
+                      req.session.accessAttempts[req.user.username] = 10;
                     }
 
-                    if (req.session.accessAttempts <= 5 && req.session.accessAttempts > 0) {
-                      return res.status(422).json({errors:[{msg:`Incorrect access code. ${req.session.accessAttempts} attempts remaining.`}]});
-                    } else if (req.session.accessAttempts == 0) {
+                    if (req.session.accessAttempts[req.user.username] <= 5 && req.session.accessAttempts[req.user.username] > 0) {
+                      return res.status(422).json({errors:[{msg:`Incorrect access code. ${req.session.accessAttempts[req.user.username]} attempts remaining.`}]});
+                    } else if (req.session.accessAttempts[req.user.username] == 0) {
                       let currentTime = new Date().getTime();
-                      let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+                      let remainingTime = ( ( req.session.timeOut[req.user.username] - currentTime ) / 3600000 ) * 60;
                       let roundedRemainingTime = Math.round(remainingTime);
                       return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
                     } else {
@@ -1089,20 +1089,20 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
           });
         } else {
-          if (req.session.accessAttempts) {
-            req.session.accessAttempts--;
-            if (req.session.accessAttempts == 0) {
-              req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+          if (req.session.accessAttempts[req.user.username]) {
+            req.session.accessAttempts[req.user.username]--;
+            if (req.session.accessAttempts[req.user.username] == 0) {
+              req.session.timeOut[req.user.username] = new Date().getTime() + 600000; // 10 min lock out
             }
           } else {
-            req.session.accessAttempts = 10;
+            req.session.accessAttempts[req.user.username] = 10;
           }
 
-          if (req.session.accessAttempts <= 5 && req.session.accessAttempts > 0) {
-            return res.status(422).json({errors:[{msg:`Incorrect key. ${req.session.accessAttempts} attempts remaining.`}]});
-          } else if (req.session.accessAttempts == 0) {
+          if (req.session.accessAttempts[req.user.username] <= 5 && req.session.accessAttempts[req.user.username] > 0) {
+            return res.status(422).json({errors:[{msg:`Incorrect key. ${req.session.accessAttempts[req.user.username]} attempts remaining.`}]});
+          } else if (req.session.accessAttempts[req.user.username] == 0) {
             let currentTime = new Date().getTime();
-            let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+            let remainingTime = ( ( req.session.timeOut[req.user.username] - currentTime ) / 3600000 ) * 60;
             let roundedRemainingTime = Math.round(remainingTime);
             return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
           } else {
@@ -1117,7 +1117,7 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
   } else {
     let currentTime = new Date().getTime();
-    let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+    let remainingTime = ( ( req.session.timeOut[req.user.username] - currentTime ) / 3600000 ) * 60;
     let roundedRemainingTime = Math.round(remainingTime);
     return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
   }

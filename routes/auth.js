@@ -31,11 +31,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   }
 
   let currentTime = new Date().getTime();
+  let username = req.body.username.toLowerCase();
+  if ((req.session.loginAttempts[`${username}`] == undefined || req.session.loginAttempts[`${username}`] > 0) && (!req.session.timeOut[`${username}`] || req.session.timeOut[`${username}`] < currentTime)) {
 
-  if ((req.session.loginAttempts == undefined || req.session.loginAttempts > 0) && (!req.session.timeOut || req.session.timeOut < currentTime)) {
-
-    if (req.session.timeOut) {
-      delete req.session.timeOut;
+    if (req.session.timeOut[`${username}`]) {
+      delete req.session.timeOut[`${username}`];
     }
 
     request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
@@ -47,26 +47,27 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           if (!user) {
             if (info.active) {
 
-              if (req.session.loginAttempts) {
-                req.session.loginAttempts--;
-                if (req.session.loginAttempts == 0) {
-                  req.session.timeOut = new Date().getTime() + 600000; // 10 min lock out
+              if (req.session.loginAttempts[`${username}`]) {
+                req.session.loginAttempts[`${username}`]--;
+                if (req.session.loginAttempts[`${username}`] == 0) {
+                  req.session.timeOut[`${username}`] = new Date().getTime() + 600000; // 10 min lock out
                 }
               } else {
-                req.session.loginAttempts = 10;
+                req.session.loginAttempts[`${username}`] = 10;
               }
 
-              if (req.session.loginAttempts <= 5 && req.session.loginAttempts > 0) {
-                info.message = `${info.message} ${req.session.loginAttempts} login attempts remaining.`;
-              } else if (req.session.loginAttempts == 0) {
+              if (req.session.loginAttempts[`${username}`] <= 5 && req.session.loginAttempts[`${username}`] > 0) {
+                info.message = `${info.message} ${req.session.loginAttempts[`${username}`]} login attempts remaining.`;
+              } else if (req.session.loginAttempts[`${username}`] == 0) {
                 let currentTime = new Date().getTime();
-                let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+                let remainingTime = ( ( req.session.timeOut[`${username}`] - currentTime ) / 3600000 ) * 60;
                 let roundedRemainingTime = Math.round(remainingTime);
                 return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
+              } else {
+                return res.status(401).json({errors:[info]}); // incorrect password
               }
 
 
-              return res.status(401).json({errors:[info]}); // incorrect password
             } else if (info.active == undefined) {
               return res.status(401).json({errors:[info]}); // user does not exist
             } else {
@@ -75,7 +76,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           }
           req.logIn(user, (err) => {
             if (err) { return next(err); }
-            delete req.session.loginAttempts;
+            delete req.session.loginAttempts[`${username}`];
             return res.json({});
           });
         })(req, res, next);
@@ -86,7 +87,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   } else {
     let currentTime = new Date().getTime();
-    let remainingTime = ( ( req.session.timeOut - currentTime ) / 3600000 ) * 60;
+    let remainingTime = ( ( req.session.timeOut[`${username}`] - currentTime ) / 3600000 ) * 60;
     let roundedRemainingTime = Math.round(remainingTime);
     return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
   }
