@@ -17,7 +17,9 @@ const studentSchema = new mongoose.Schema({
   forgotPassword: String,
   forgotPasswordTimer:Number,
   classrooms_master: [{type: mongoose.Schema.Types.ObjectId, ref: 'Classroom'}],
-  classrooms_student: [{type: mongoose.Schema.Types.ObjectId, ref: 'Classroom'}]
+  classrooms_student: [{type: mongoose.Schema.Types.ObjectId, ref: 'Classroom'}],
+  loginAttempts: {type:Number,default:0},
+  loginTimeout: Number
 });
 
 module.exports = mongoose.model('Student',studentSchema);

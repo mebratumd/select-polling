@@ -970,13 +970,7 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     return res.status(422).json({ errors: errors.array() });
   }
 
-  let currentTime = new Date().getTime();
 
-  if ((req.session[req.user.username] == undefined || req.session[req.user.username] > 0) && (!req.session[`${req.user.username}_timeOut`] || req.session[`${req.user.username}_timeOut`] < currentTime)) {
-
-    if (req.session[`${req.user.username}_timeOut`]) {
-      delete req.session[`${req.user.username}_timeOut`]
-    }
 
     if (req.params.key === "code") {
       Classroom.findOne({ name:req.body.name }).populate('elections').exec((err,classroom) => {
@@ -987,61 +981,35 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
               const studentIds = classroom.students.map(student => student.email);
               if (studentIds.includes(req.user.email)) {
 
-                if (classroom.elections.length > 0) {
+                const firstElection = classroom.elections.filter(el => el.status == true)[0];
+                const pass = firstElection.tokens.find((student) => {
+                  return student.email == req.user.email && student.hash == req.body.password;
+                });
 
-                  const firstElection = classroom.elections.filter(el => el.status == true)[0];
-                  const pass = firstElection.tokens.find((student) => {
-                    return student.email == req.user.email && student.hash == req.body.password;
-                  });
-
-                  if (!pass) {
-
-                    if (req.session[req.user.username]) {
-                      req.session[req.user.username]--;
-                      if (req.session[req.user.username] == 0) {
-                        req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 600000; // 10 min lock out
-                      }
-                    } else {
-                      req.session[req.user.username] = 10;
-                    }
-
-                    if (req.session[req.user.username] <= 5 && req.session[req.user.username] > 0) {
-                      return res.status(422).json({errors:[{msg:`Incorrect access code. ${req.session[req.user.username]} attempts remaining.`}]});
-                    } else if (req.session[req.user.username] == 0) {
-                      let currentTime = new Date().getTime();
-                      let remainingTime = ( ( req.session[`${req.user.username}_timeOut`] - currentTime ) / 3600000 ) * 60;
-                      let roundedRemainingTime = Math.round(remainingTime);
-                      return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
-                    } else {
-                      return res.status(422).json({errors:[{msg:'Incorrect access code.'}]});
-                    }
-
-
-                  } else {
-                    Election.find({tokens: {$elemMatch : { email:req.user.email,hash:req.body.password }}}).exec((err,polls) => {
-                      if (err) next(err)
-                      if (polls) {
-                        polls.forEach((poll,idx)=>{
-                          poll.electionAccess.forEach(async function(person,i) {
-                            if (person.email == req.user.email) {
-                              poll.electionAccess.splice(i,1,{_id:person._id,email:req.user.email,permission:true});
-                              await poll.save().then(()=>{}).catch(err => next(err));
-                              if (polls.length == idx+1) {
-                                delete req.session[req.user.username]
-                                return res.json({});
-                              }
-                            }
-                          });
-                        });
-                      } else {
-                        throw new Error('Oops. Something went wrong. Please try submitting details again.');
-                      }
-                    });
-                  }
+                if (!pass) {
+                  throw new Error('Incorrect access code.');
                 } else {
-                  //
-                  throw new Error('No elections currently going on.');
+                  Election.find({tokens: {$elemMatch : { email:req.user.email,hash:req.body.password }}}).exec((err,polls) => {
+                    if (err) next(err)
+                    if (polls) {
+                      polls.forEach((poll,idx)=>{
+                        poll.electionAccess.forEach(async function(person,i) {
+                          if (person.email == req.user.email) {
+                            poll.electionAccess.splice(i,1,{_id:person._id,email:req.user.email,permission:true});
+                            await poll.save().then(()=>{}).catch(err => next(err));
+                            if (polls.length == idx+1) {
+                              delete req.session[req.user.username]
+                              return res.json({});
+                            }
+                          }
+                        });
+                      });
+                    } else {
+                      throw new Error('Oops. Something went wrong. Please try submitting details again.');
+                    }
+                  });
                 }
+
 
               } else {
                 // student is not apart of the classroom
@@ -1062,7 +1030,7 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     }
 
 
-    if (req.params.key == "key") {
+    if (req.params.key === "key") {
       bcrypt.compare(req.body.password,req.user.key,(error,response)=>{
         if (error) {
           next(error);
@@ -1090,38 +1058,15 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
           });
         } else {
-          if (req.session[req.user.username]) {
-            req.session[req.user.username]--;
-            if (req.session[req.user.username] == 0) {
-              req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 600000; // 10 min lock out
-            }
-          } else {
-            req.session[req.user.username] = 10;
-          }
 
-          if (req.session[req.user.username] <= 5 && req.session[req.user.username] > 0) {
-            return res.status(422).json({errors:[{msg:`Incorrect key. ${req.session[req.user.username]} attempts remaining.`}]});
-          } else if (req.session[req.user.username] == 0) {
-            let currentTime = new Date().getTime();
-            let remainingTime = ( ( req.session[`${req.user.username}_timeOut`] - currentTime ) / 3600000 ) * 60;
-            let roundedRemainingTime = Math.round(remainingTime);
-            return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
-          } else {
-            return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
-          }
-
+          return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
 
         }
       });
     }
 
 
-  } else {
-    let currentTime = new Date().getTime();
-    let remainingTime = ( ( req.session[`${req.user.username}_timeOut`] - currentTime ) / 3600000 ) * 60;
-    let roundedRemainingTime = Math.round(remainingTime);
-    return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
-  }
+
 
 
 

@@ -30,18 +30,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     return res.status(422).json({ errors: errors.array() });
   }
 
-  let currentTime = new Date().getTime();
-  let person = req.body.username.toLowerCase();
-  if ((req.session[person] == undefined || req.session[person] > 0) || (!req.session[`${person}_timeOut`] || req.session[`${person}_timeOut`] < currentTime)) {
-
-    if (req.session[`${person}_timeOut`] < currentTime) {
-      delete req.session[`${person}_timeOut`];
-      delete req.session[person];
-    }
-
-
-
-    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+  request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
       if (JSON.parse(body).score <= 0.3) {
         return res.status(422).json({errors:[{msg:'Something wrong.'}]});
       } else {
@@ -50,23 +39,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           if (!user) {
             if (info.active) {
 
-              if (req.session[person]) {
-                req.session[person]--;
-                if (req.session[person] == 0) {
-                  req.session[`${person}_timeOut`] = new Date().getTime() + 600000; // 10 min lock out
-                }
-              } else {
-                req.session[person] = 10;
-              }
 
-              if (req.session[person] <= 5 && req.session[person] > 0) {
-                info.message = `${info.message} ${req.session[person]} login attempts remaining.`;
-              } else if (req.session[person] == 0) {
-                let currentTime = new Date().getTime();
-                let remainingTime = ( ( req.session[`${person}_timeOut`] - currentTime ) / 3600000 ) * 60;
-                let roundedRemainingTime = Math.round(remainingTime);
-                return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to access your account. ${roundedRemainingTime} minutes left.`}]});
-              }
 
               return res.status(401).json({errors:[info]}); // incorrect password
 
@@ -79,7 +52,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
           req.logIn(user, (err) => {
             if (err) { return next(err); }
-            delete req.session[person];
             return res.json({});
           });
 
@@ -89,12 +61,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
     });
 
-  } else {
-    let currentTime = new Date().getTime();
-    let remainingTime = ( ( req.session[`${person}_timeOut`] - currentTime ) / 3600000 ) * 60;
-    let roundedRemainingTime = Math.round(remainingTime);
-    return res.status(422).json({errors:[{msg:`Account locked. Please wait 10 minutes before trying to login to your account. ${roundedRemainingTime} minutes left.`}]});
-  }
+
 
 
 
@@ -167,6 +134,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     });
 
   }
+
 
   if (!req.session.registered) {
 
@@ -376,6 +344,10 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
   } else {
     return res.status(422).json({errors:[{msg:'You\'ve already registered your account. If you haven\'t already, please activate it.'}]});
   }
+
+
+
+
 
 
 
