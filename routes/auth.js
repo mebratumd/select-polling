@@ -848,7 +848,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
                 student.forgotPassword = undefined;
                 student.forgotPasswordTimer = undefined;
                 student.save().then(() => {
-                  return res.redirect("/login");
+                  return res.json({});
                 }).catch(err => next(err));
               });
             });
