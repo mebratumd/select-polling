@@ -532,7 +532,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
@@ -612,7 +612,7 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
