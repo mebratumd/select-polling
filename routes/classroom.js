@@ -995,12 +995,15 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
   }
 
   console.log(req.session.attempts);
-  
+
   let currentTime = new Date().getTime();
+
+  console.log(req.session.timeout < currentTime);
 
   if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
+      console.log("deleted");
       delete req.session.attempts;
       delete req.session.timeout;
     }

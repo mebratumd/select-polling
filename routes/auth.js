@@ -39,8 +39,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           if (!user) {
             if (info.active) {
 
-
-
               return res.status(401).json({errors:[info]}); // incorrect password
 
             } else if (info.active == undefined) {
