@@ -108,72 +108,98 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.findOne({name:req.body.name}).populate("elections").exec((err,room)=>{
-    if (err) next(err)
-    if (room) {
-      bcrypt.compare(req.body.password,room.password,(err,resp)=>{
+  let currentTime = new Date().getTime();
 
-        if (err) next(err)
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
-        if (resp){
-          const student = room.students.filter((student)=>{
-            return student.email === req.user.email;
-          });
-
-          if (student.length > 0) {
-            if (room.elections.length > 0) {
-
-              const tkn = uuidv4();
-              room.elections.filter(el => el.status == true).forEach(async function(e) {
-                ongoingElec = await Election.findById(e._id).exec();
-                didVote = ongoingElec.voteStatus.filter(voteOb => voteOb.email == student[0].email);
-                if (didVote.length == 0) {
-                  ongoingElec.tokens.push({email:student[0].email,hash:tkn});
-                  ongoingElec.electionAccess.push({email:student[0].email,permission:false});
-                  ongoingElec.voteStatus.push({email:student[0].email,didVote:false});
-                  await ongoingElec.save()
-                }
-              })
-            }
-            // success
-            Student.findById(req.user.id).exec((e,s)=>{
-              if (e) next(e)
-              if (s) {
-
-                if (s.classrooms_student.length < 5) {
-                  s.classrooms_student.push(room.id);
-                  room.joined = room.joined + 1;
-                  room.save().catch(err => next(err));
-                  s.save().then(() => {
-                    return res.json({})
-                  }).catch((err) => next(err));
-
-                } else {
-                  return res.status(422).json({errors:[{msg:`You have reached the limit for the amount of classrooms you can be a student in (max 5).`}]});
-                }
-
-              } else {
-                return res.status(422).json({errors:[{msg:`Something went wrong. Please submit details again.`}]});
-              }
-            });
-
-          } else {
-            // not apart of classroom
-            return res.status(422).json({errors:[{msg:`You are not in the class list for ${room.name}.`}]});
-          }
-
-        } else {
-          // incorrect password
-          return res.status(422).json({errors:[{msg:`Incorrect password for ${room.name}.`}]});
-        }
-      })
-    } else {
-      // doesn't exist
-      return res.status(422).send("Classroom doesn't exist.");
-
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
     }
 
-  });
+    Classroom.findOne({name:req.body.name}).populate("elections").exec((err,room)=>{
+      if (err) next(err)
+      if (room) {
+        bcrypt.compare(req.body.password,room.password,(err,resp)=>{
+
+          if (err) next(err)
+
+          if (resp){
+            const student = room.students.filter((student)=>{
+              return student.email === req.user.email;
+            });
+
+            if (student.length > 0) {
+              if (room.elections.length > 0) {
+
+                const tkn = uuidv4();
+                room.elections.filter(el => el.status == true).forEach(async function(e) {
+                  ongoingElec = await Election.findById(e._id).exec();
+                  didVote = ongoingElec.voteStatus.filter(voteOb => voteOb.email == student[0].email);
+                  if (didVote.length == 0) {
+                    ongoingElec.tokens.push({email:student[0].email,hash:tkn});
+                    ongoingElec.electionAccess.push({email:student[0].email,permission:false});
+                    ongoingElec.voteStatus.push({email:student[0].email,didVote:false});
+                    await ongoingElec.save()
+                  }
+                })
+              }
+              // success
+              Student.findById(req.user.id).exec((e,s)=>{
+                if (e) next(e)
+                if (s) {
+
+                  if (s.classrooms_student.length < 5) {
+                    s.classrooms_student.push(room.id);
+                    room.joined = room.joined + 1;
+                    room.save().catch(err => next(err));
+                    s.save().then(() => {
+                      return res.json({})
+                    }).catch((err) => next(err));
+
+                  } else {
+                    return res.status(422).json({errors:[{msg:`You have reached the limit for the amount of classrooms you can be a student in (max 5).`}]});
+                  }
+
+                } else {
+                  return res.status(422).json({errors:[{msg:`Something went wrong. Please submit details again.`}]});
+                }
+              });
+
+            } else {
+              // not apart of classroom
+              return res.status(422).json({errors:[{msg:`You are not in the class list for ${room.name}.`}]});
+            }
+
+          } else {
+            // incorrect password
+            if (req.session.attempts) {
+              req.session.attempts--;
+              if (req.session.attempts == 0) {
+                req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+              }
+            } else {
+              req.session.attempts = 9;
+            }
+
+            return res.status(422).json({errors:[{msg:`Incorrect password for ${room.name}.`}]});
+          }
+        })
+      } else {
+        // doesn't exist
+        return res.status(422).send("Classroom doesn't exist.");
+
+      }
+
+    });
+
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
+
 
 });
 
@@ -435,8 +461,6 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
       return res.status(422).json({errors:[{msg:"A maximum of 5 classes can be administrated per user."}]});
     }
   })
-
-
 
 
 });
@@ -970,7 +994,14 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     return res.status(422).json({ errors: errors.array() });
   }
 
+  let currentTime = new Date().getTime();
 
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
+    }
 
     if (req.params.key === "code") {
       Classroom.findOne({ name:req.body.name }).populate('elections').exec((err,classroom) => {
@@ -987,6 +1018,16 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
                 });
 
                 if (!pass) {
+
+                  if (req.session.attempts) {
+                    req.session.attempts--;
+                    if (req.session.attempts == 0) {
+                      req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+                    }
+                  } else {
+                    req.session.attempts = 9;
+                  }
+
                   throw new Error('Incorrect access code.');
                 } else {
                   Election.find({tokens: {$elemMatch : { email:req.user.email,hash:req.body.password }}}).exec((err,polls) => {
@@ -1059,17 +1100,24 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
           });
         } else {
 
+          if (req.session.attempts) {
+            req.session.attempts--;
+            if (req.session.attempts == 0) {
+              req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+            }
+          } else {
+            req.session.attempts = 9;
+          }
+
           return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
 
         }
       });
     }
 
-
-
-
-
-
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
 
 
 });
@@ -1547,58 +1595,83 @@ router.post("/expired",authenticated,(req,res,next) => {
 
 router.post("/delete-poll",authenticated,(req,res,next) => {
 
+  let currentTime = new Date().getTime();
 
-      Classroom.findOne({name:req.body.name}).populate({
-        path:'elections',
-        populate: {
-          path: 'candidates'
-        }
-      }).exec((err,room) => {
-        if (err) next(err)
-        if (room.master == req.user.id) {
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
-          if (mongoose.Types.ObjectId.isValid(req.body.id)) {
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
+    }
 
-            Election.findById(req.body.id).exec((error,poll)=>{
-              if (error) next(error)
-              if (poll) {
-                if (poll.status) {
-                  bcrypt.compare(req.body.password,room.password,(e,r)=>{
-                    if (e) next(e)
-                    if (r) {
-                      let updatedElections = room.elections.filter(elections => elections._id.toString() != req.body.id);
-                      room.elections = updatedElections;
-                      room.save().then(()=>{
-                        Election.deleteOne({_id:req.body.id},(err,result)=>{
-                          if (err) next(err)
-                        });
-                        return res.json({elections:updatedElections});
-                      }).catch((err)=>next(err));
+    Classroom.findOne({name:req.body.name}).populate({
+      path:'elections',
+      populate: {
+        path: 'candidates'
+      }
+    }).exec((err,room) => {
+      if (err) next(err)
+      if (room.master == req.user.id) {
+
+        if (mongoose.Types.ObjectId.isValid(req.body.id)) {
+
+          Election.findById(req.body.id).exec((error,poll)=>{
+            if (error) next(error)
+            if (poll) {
+              if (poll.status) {
+                bcrypt.compare(req.body.password,room.password,(e,r)=>{
+                  if (e) next(e)
+                  if (r) {
+                    let updatedElections = room.elections.filter(elections => elections._id.toString() != req.body.id);
+                    room.elections = updatedElections;
+                    room.save().then(()=>{
+                      Election.deleteOne({_id:req.body.id},(err,result)=>{
+                        if (err) next(err)
+                      });
+                      return res.json({elections:updatedElections});
+                    }).catch((err)=>next(err));
+                  } else {
+
+                    if (req.session.attempts) {
+                      req.session.attempts--;
+                      if (req.session.attempts == 0) {
+                        req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+                      }
                     } else {
-                      return res.status(422).json({ errors: [{msg:"Incorrect password."}] });
+                      req.session.attempts = 9;
                     }
-                  })
-                } else {
-                  return res.status(422).json({errors:[{msg:'This poll has already expired.'}]});
-                }
+
+                    return res.status(422).json({ errors: [{msg:"Incorrect password."}] });
+                  }
+                })
               } else {
-                return res.status(422).json({errors:[{msg:'Poll does not exist.'}]});
+                return res.status(422).json({errors:[{msg:'This poll has already expired.'}]});
               }
+            } else {
+              return res.status(422).json({errors:[{msg:'Poll does not exist.'}]});
+            }
 
-            })
-
-
-          } else {
-            return res.status(422).json({errors:[{msg:'Invalid poll ID.'}]});
-          }
-
-
+          })
 
 
         } else {
-          return res.status(422).json({ errors: [{msg:"You do not have permission to perform this action."}] });
+          return res.status(422).json({errors:[{msg:'Invalid poll ID.'}]});
         }
-      });
+
+
+
+
+      } else {
+        return res.status(422).json({ errors: [{msg:"You do not have permission to perform this action."}] });
+      }
+    });
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
+
+
 
 });
 
@@ -1614,62 +1687,89 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
     return res.status(422).json({ errors: errors.array() });
   }
 
-  Classroom.findOne({ name:req.body.name },(err,room)=>{
-    if (err) next(err)
-    if (room) {
-      bcrypt.compare(req.body.password, room.password, (err,resp)=>{
-        if (err) next(err)
-          if (resp) {
-            if (room.master == req.user.id) {
 
-              Student.find({$or:[{classrooms_master:room.id},{classrooms_student:room.id}]}).exec((err,students)=>{
-                if (err) next(err)
+  let currentTime = new Date().getTime();
 
-                // removes from master list
-                students.forEach(async function(student) {
-                  idxM = student.classrooms_master.indexOf(room.id);
-                  if (idxM > -1) {
-                    student.classrooms_master.splice(idxM,1);
-                    await student.save().then(()=>{}).catch((err)=>next(err))
-                  }
-                });
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
-                // removes from student list
-                students.forEach(async function (student) {
-                  idxS = student.classrooms_student.indexOf(room.id);
-                  if (idxS > -1) {
-                    student.classrooms_student.splice(idxS,1);
-                    await student.save().then(()=>{}).catch((err)=>next(err))
-                  }
-                });
-
-
-                // deletes all elections associated with master classrooms
-                if (room.elections.length >0) {
-                  Election.deleteMany({_id:{$in:room.elections}},(err,docs)=>{
-                    if (err) next(err)
-                  });
-                }
-
-                room.remove((err,result)=>{
-                  if (err) next(err)
-                  return res.json({}); //success
-                });
-
-              });
-
-
-            } else {
-              return res.status(401).json({errors:[{msg:"You do not have permission to delete this class."}]})
-            }
-          } else {
-            return res.status(401).json({errors:[{msg:"Password is incorrect."}]});
-          }
-      });
-    } else {
-      return res.status(401).json({errors:[{msg:"Classroom does not exist."}]});
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
     }
-  })
+
+    Classroom.findOne({ name:req.body.name },(err,room)=>{
+      if (err) next(err)
+      if (room) {
+        bcrypt.compare(req.body.password, room.password, (err,resp)=>{
+          if (err) next(err)
+            if (resp) {
+              if (room.master == req.user.id) {
+
+                Student.find({$or:[{classrooms_master:room.id},{classrooms_student:room.id}]}).exec((err,students)=>{
+                  if (err) next(err)
+
+                  // removes from master list
+                  students.forEach(async function(student) {
+                    idxM = student.classrooms_master.indexOf(room.id);
+                    if (idxM > -1) {
+                      student.classrooms_master.splice(idxM,1);
+                      await student.save().then(()=>{}).catch((err)=>next(err))
+                    }
+                  });
+
+                  // removes from student list
+                  students.forEach(async function (student) {
+                    idxS = student.classrooms_student.indexOf(room.id);
+                    if (idxS > -1) {
+                      student.classrooms_student.splice(idxS,1);
+                      await student.save().then(()=>{}).catch((err)=>next(err))
+                    }
+                  });
+
+
+                  // deletes all elections associated with master classrooms
+                  if (room.elections.length >0) {
+                    Election.deleteMany({_id:{$in:room.elections}},(err,docs)=>{
+                      if (err) next(err)
+                    });
+                  }
+
+                  room.remove((err,result)=>{
+                    if (err) next(err)
+                    return res.json({}); //success
+                  });
+
+                });
+
+
+              } else {
+                return res.status(401).json({errors:[{msg:"You do not have permission to delete this class."}]})
+              }
+            } else {
+
+              if (req.session.attempts) {
+                req.session.attempts--;
+                if (req.session.attempts == 0) {
+                  req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+                }
+              } else {
+                req.session.attempts = 9;
+              }
+
+              return res.status(401).json({errors:[{msg:"Password is incorrect."}]});
+            }
+        });
+      } else {
+        return res.status(401).json({errors:[{msg:"Classroom does not exist."}]});
+      }
+    })
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
+
 
 });
 
@@ -1685,36 +1785,63 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
     return res.status(422).json({ errors: errors.array() });
   }
 
-  // password, name
 
-  bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
-    if (err) next(err)
-    if (resp) {
-      Student.findById(req.user.id).populate('classrooms_student').exec((err,student)=>{
-        if (err) next(err)
-        if (student) {
-          student.classrooms_student = student.classrooms_student.filter(room => room.name != req.body.name);
-          student.save().then().catch((err)=>next(err));
-          Classroom.find({name:req.body.name}).exec((err,room)=>{
-            if (err) next(err)
-            room.joined = room.joined - 1;
-            room.save().then(()=>{
-              return res.json({});
-            }).catch((err)=>next(err));
-          });
-        } else {
-          return res.status(422).json({errors:[{msg:'User not found.'}]});
-        }
-      })
-    } else {
-      return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
+  let currentTime = new Date().getTime();
+
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
     }
 
-  });
+    // password, name
+
+    bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
+      if (err) next(err)
+      if (resp) {
+        Student.findById(req.user.id).populate('classrooms_student').exec((err,student)=>{
+          if (err) next(err)
+          if (student) {
+            student.classrooms_student = student.classrooms_student.filter(room => room.name != req.body.name);
+            student.save().then().catch((err)=>next(err));
+            Classroom.find({name:req.body.name}).exec((err,room)=>{
+              if (err) next(err)
+              room.joined = room.joined - 1;
+              room.save().then(()=>{
+                return res.json({});
+              }).catch((err)=>next(err));
+            });
+          } else {
+            return res.status(422).json({errors:[{msg:'User not found.'}]});
+          }
+        })
+      } else {
+
+        if (req.session.attempts) {
+          req.session.attempts--;
+          if (req.session.attempts == 0) {
+            req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+          }
+        } else {
+          req.session.attempts = 9;
+        }
+
+        return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
+      }
+
+    });
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
+
 
 });
 
-router.get("/permission/:id",(req,res,next)=>{
+router.get("/permission/:id",authenticated,(req,res,next)=>{
   if (mongoose.Types.ObjectId.isValid(req.params.id)) {
 
       Election.findOne({_id: req.params.id}).populate({

@@ -3,6 +3,7 @@ const { check, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const Student = require('../models/student.js');
 const Classroom = require('../models/classroom.js');
+const Registration = require('../models/registration.js');
 const Election = require('../models/election.js');
 const router = express.Router();
 const passport = require('passport');
@@ -24,7 +25,6 @@ router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Us
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {
 
-  //console.log(req.session);
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(422).json({ errors: errors.array() });
@@ -67,6 +67,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 
 });
+
+
 
 router.post("/register", [check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail(),
 check('status').isIn(['yes','no']).withMessage('Please submit a valid status.'),
@@ -158,6 +160,35 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
 
     p.then(()=>{
+
+      return new Promise((resolve,reject)=>{
+        Registration.find({}).exec((err,info)=>{
+          if (err) reject(err);
+          if (info.length > 0) {
+            let currentTime = new Date().getTime();
+            let delta = currentTime - info[0].time;
+            if (info[0].counter >= 400 && delta < 3600000) {
+              reject('Cannot fulfill registration, please come back later.');
+            }
+
+            if (delta >= 3600000) {
+              info[0].counter = 0;
+              info[0].save().then(()=>{
+                resolve();
+              })
+            } else {
+              resolve();
+            }
+
+
+
+          } else {
+            resolve();
+          }
+        })
+      });
+
+    }).then(()=>{
       if (typeof schoolExtensions[req.body.school] == "object") {
         validEmail = schoolExtensions[req.body.school].some((extension)=>{
           const re = new RegExp(`${extension}$`);
@@ -246,7 +277,35 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                           if (student) {
 
                             req.session.registered = true;
+
                             emailSend(student.email,`https://www.selectpolling.ca/a/${student.username}/${student.hash}`,student.firstname).then(()=>{
+
+                              return new Promise((resolve,reject)=>{
+                                Registration.find({}).exec((err,info)=>{
+                                  if (err) reject(err);
+                                  if (info.length > 0) {
+                                    info[0].counter = info[0].counter + 1;
+                                    if (info[0].counter == 1) {
+                                      info[0].time = new Date().getTime();
+                                    }
+                                    info[0].save().then(()=>{
+                                      resolve();
+                                    });
+                                  } else {
+                                    const newEntry = new Registration({
+                                      time: new Date().getTime(),
+                                      counter: 1
+                                    });
+                                    newEntry.save().then(()=>{
+                                      resolve();
+                                    })
+                                  }
+                                });
+                              });
+
+
+
+                            }).then(()=>{
                               return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
                             }).catch((err) => {
                               next(err)
@@ -309,7 +368,36 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                       if (master) {
                         req.session.registered = true;
                         emailSend(master.email,`https://www.selectpolling.ca/a/${master.username}/${master.hash}`,master.firstname).then(()=>{
-                          return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
+
+                          return new Promise((resolve,reject)=>{
+                            Registration.find({}).exec((err,info)=>{
+                              console.log(info);
+                              if (err) reject(err);
+                              if (info.length > 0) {
+                                info[0].counter = info[0].counter + 1;
+                                console.log(info[0].counter);
+                                if (info[0].counter == 1) {
+                                  info[0].time = new Date().getTime();
+                                }
+                                info[0].save().then(()=>{
+                                  resolve();
+                                });
+                              } else {
+                                const newEntry = new Registration({
+                                  time: new Date().getTime(),
+                                  counter: 1
+                                });
+                                newEntry.save().then(()=>{
+                                  resolve();
+                                })
+                              }
+                            });
+                          });
+
+                        }).then(()=>{
+
+                            return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
+
                         }).catch((err) => {
                           next(err)
                         });
@@ -335,7 +423,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       });
 
     }).catch((e)=>{
-      next(e)
+      if (e == 'Cannot fulfill registration, please come back later.') {
+        return res.status(422).json({errors:[{msg:'Cannot fulfill registration, please come back later.'}]});
+      } else {
+        next(e)
+      }
     });
 
 
@@ -440,6 +532,55 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     return res.status(422).json({ errors: errors.array() });
   }
 
+  let currentTime = new Date().getTime();
+
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
+    }
+
+    p.then(()=>{
+
+      bcrypt.compare(req.body.old,req.user.password,(err,resp)=>{
+        if (err) throw new Error(err);
+        if (resp) {
+          Student.findById(req.user.id).exec((err,user)=>{
+            if (err) throw new Error(err)
+            bcrypt.genSalt(10,(err,salt)=>{
+              if (err) throw new Error(err)
+              bcrypt.hash(req.body.new, salt, (err,hash)=>{
+                if (err) throw new Error(err)
+                user.password = hash;
+                user.save().then(() => res.json({}) ).catch((err) => next(err));
+              });
+            })
+
+          });
+        } else {
+
+          if (req.session.attempts) {
+            req.session.attempts--;
+            if (req.session.attempts == 0) {
+              req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+            }
+          } else {
+            req.session.attempts = 9;
+          }
+
+          return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
+        }
+
+      });
+
+    }).catch(err => next(err))
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
   let p = new Promise((resolve,reject)=>{
 
     request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
@@ -457,30 +598,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   });
 
-  p.then(()=>{
 
-    bcrypt.compare(req.body.old,req.user.password,(err,resp)=>{
-      if (err) throw new Error(err);
-      if (resp) {
-        Student.findById(req.user.id).exec((err,user)=>{
-          if (err) throw new Error(err)
-          bcrypt.genSalt(10,(err,salt)=>{
-            if (err) throw new Error(err)
-            bcrypt.hash(req.body.new, salt, (err,hash)=>{
-              if (err) throw new Error(err)
-              user.password = hash;
-              user.save().then(() => res.json({}) ).catch((err) => next(err));
-            });
-          })
-
-        });
-      } else {
-        return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
-      }
-
-    });
-
-  }).catch(err => next(err))
 
 
 
@@ -494,54 +612,80 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
     return res.status(422).json({ errors: errors.array() });
   }
 
-  bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
-    if (err) next(err)
-    if (resp) {
+  let currentTime = new Date().getTime();
 
-      deleteUSER = async () => {
-        // removes user from classrooms they are student of
-        let u = await Student.findById(req.user.id).exec();
-        let user_student_rooms = await Classroom.find({id:{$in:u.classrooms_student}}).exec();
-        for(let i=0;i<user_student_rooms.length;i++) {
-          user_student_rooms[i].joined = user_student_rooms[i].joined - 1;
-          await user_student_rooms[i].save()
-        }
+  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
-        // removes students from classroom that user is master of
-        let students = await Student.find({classrooms_student:{$in:u.classrooms_master}}).exec();
-        for (let i=0;i<students.length;i++) {
-          students[i].classrooms_student = students[i].classrooms_student.filter((room)=>{
-            return u.classrooms_master.indexOf(room) == -1;
-          });
-          await students[i].save();
-        }
-
-        // deletes all elections associated with master classrooms
-        let master_rooms = await Classroom.find({_id:{$in:u.classrooms_master}}).exec();
-        for(let i=0;i<master_rooms.length;i++) {
-          if (master_rooms[i].elections.length > 0) {
-            await Election.deleteMany({_id:{$in:master_rooms[i].elections}},(err,docs)=>{});
-          }
-
-        }
-
-        // deletes all master classrooms
-        let user_master_rooms = await Classroom.deleteMany({_id:{$in:u.classrooms_master}},(err,docs)=>{});
-
-        // deletes user
-        await u.remove();
-
-        return res.json({});
-
-      }
-
-      deleteUSER().catch(err => next(err));
-
-    } else {
-      return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
+    if (req.session.timeout) {
+      delete req.session.attempts;
+      delete req.session.timeout;
     }
 
-  })
+    bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
+      if (err) next(err)
+      if (resp) {
+
+        deleteUSER = async () => {
+          // removes user from classrooms they are student of
+          let u = await Student.findById(req.user.id).exec();
+          let user_student_rooms = await Classroom.find({id:{$in:u.classrooms_student}}).exec();
+          for(let i=0;i<user_student_rooms.length;i++) {
+            user_student_rooms[i].joined = user_student_rooms[i].joined - 1;
+            await user_student_rooms[i].save()
+          }
+
+          // removes students from classroom that user is master of
+          let students = await Student.find({classrooms_student:{$in:u.classrooms_master}}).exec();
+          for (let i=0;i<students.length;i++) {
+            students[i].classrooms_student = students[i].classrooms_student.filter((room)=>{
+              return u.classrooms_master.indexOf(room) == -1;
+            });
+            await students[i].save();
+          }
+
+          // deletes all elections associated with master classrooms
+          let master_rooms = await Classroom.find({_id:{$in:u.classrooms_master}}).exec();
+          for(let i=0;i<master_rooms.length;i++) {
+            if (master_rooms[i].elections.length > 0) {
+              await Election.deleteMany({_id:{$in:master_rooms[i].elections}},(err,docs)=>{});
+            }
+
+          }
+
+          // deletes all master classrooms
+          let user_master_rooms = await Classroom.deleteMany({_id:{$in:u.classrooms_master}},(err,docs)=>{});
+
+          // deletes user
+          await u.remove();
+
+          return res.json({});
+
+        }
+
+        deleteUSER().catch(err => next(err));
+
+      } else {
+
+        if (req.session.attempts) {
+          req.session.attempts--;
+          if (req.session.attempts == 0) {
+            req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+          }
+        } else {
+          req.session.attempts = 9;
+        }
+
+        return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
+      }
+
+    });
+
+
+  } else {
+    return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
+  }
+
+
 
 });
 
@@ -639,11 +783,6 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
 
           }
 
-
-
-
-
-
         } else {
           return res.status(404).json({ errors: [{msg:'This email is not registered with a user.'}]});
         }
@@ -653,10 +792,6 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
     }
 
   });
-
-
-
-
 
 });
 
@@ -710,10 +845,10 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
               bcrypt.hash(req.body.password, salt, (err, hash) => {
                 if (err) next(err)
                 student.password = hash;
-                student.forgotPassword = "";
-                student.forgotPasswordTimer = 0;
+                student.forgotPassword = undefined;
+                student.forgotPasswordTimer = undefined;
                 student.save().then(() => {
-                  return res.json({});
+                  return res.redirect("/login");
                 }).catch(err => next(err));
               });
             });
