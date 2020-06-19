@@ -110,7 +110,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
@@ -994,16 +994,11 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     return res.status(422).json({ errors: errors.array() });
   }
 
-  console.log(req.session.attempts);
-
   let currentTime = new Date().getTime();
 
-  console.log(req.session.timeout < currentTime);
-
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
-      console.log("deleted");
       delete req.session.attempts;
       delete req.session.timeout;
     }
@@ -1602,7 +1597,7 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
@@ -1695,7 +1690,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
@@ -1793,7 +1788,7 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
   let currentTime = new Date().getTime();
 
-  if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
 
     if (req.session.timeout) {
       delete req.session.attempts;
