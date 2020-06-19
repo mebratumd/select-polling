@@ -994,6 +994,8 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
     return res.status(422).json({ errors: errors.array() });
   }
 
+  console.log(req.session.attempts);
+  
   let currentTime = new Date().getTime();
 
   if (!req.session.attempts || req.session.attempts > 0 || req.session.timeout < currentTime) {
