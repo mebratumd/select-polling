@@ -704,7 +704,7 @@ check('description').custom(description => typeof description == "string").withM
   }
 }),
 check('approvalRate').optional(),
-check('duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.1 && time <= 168 ).withMessage("Duration must be between 0.1 (6 minutes) and 168 hours.")],(req,res,next)=>{
+check('duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.5 && time <= 168 ).withMessage("Duration must be between 0.5 (30 minutes) and 168 hours.")],(req,res,next)=>{
 
 
   const errors = validationResult(req);
@@ -788,7 +788,7 @@ check('sheet.*.description').custom(description => typeof description == "string
 }),
 check('sheet.*.vacancies').isInt().withMessage('Vacancies must be an integer.'),
 check('sheet.*.type').isIn(['stv','fpp','approval']).withMessage('Not a valid election type.'),
-check('sheet.*.duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.1 && time <= 168 ).withMessage("All durations must be between 0.1 (6 minutes) and 168 hours."),
+check('sheet.*.duration').custom(duration => typeof duration == "number").withMessage("Invalid format for election duration.").custom(time => time >= 0.5 && time <= 168 ).withMessage("All durations must be between 0.5 (30 minutes) and 168 hours."),
 check('classname').isLength({min:6,max:12}).withMessage('Class name must be between 6-12 characters.').matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Class name must only contain letters (french or english) and/or numbers.").customSanitizer((val) => {
   if (val) {
     return val.toLowerCase();
