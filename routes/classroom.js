@@ -1920,81 +1920,90 @@ router.get("/permission/:id",authenticated,(req,res,next)=>{
 
 router.get("/download/:id",authenticated,(req,res,next)=>{
 
-  if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-    Election.findById(req.params.id).populate({
-      path: 'class',
-      select: 'name master'
-    }).select('-tokens -status -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
-      if (err) next(err)
-      if (election) {
-        if (req.user.id != election.class.master) {
-          return res.status(401).json({errors:[{msg:'You do not have permission to perform this action.'}]});
-        }
+  if (req.params.id == 1) {
+    res.download("/electionex.txt");
+  } else {
 
-        election.total_votes = election.total;
-        delete election.class.master;
-        delete election.class._id;
-        delete election.total;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      Election.findById(req.params.id).populate({
+        path: 'class',
+        select: 'name master'
+      }).select('-tokens -status -count._id -elected_STV._id -winners._id -count_STV._id -candidates._id -__v -electionAccess -voteStatus -count_STV.ranks').lean().exec((err,election)=>{
+        if (err) next(err)
+        if (election) {
+          if (req.user.id != election.class.master) {
+            return res.status(401).json({errors:[{msg:'You do not have permission to perform this action.'}]});
+          }
 
-        if (election.type == "fpp") {
-          delete election.count_STV;
-          delete election.elected_STV;
-          delete election.canApprovalRate;
-          delete election.quota;
-        }
+          election.total_votes = election.total;
+          delete election.class.master;
+          delete election.class._id;
+          delete election.total;
 
-        if (election.type == "approval") {
-          if (election.candidates.length == 1) {
-            election.candidate_approval_rate = election.canApprovalRate;
-            election.approval_rate_for_election = election.approvalRate;
+          if (election.type == "fpp") {
             delete election.count_STV;
             delete election.elected_STV;
-            delete election.quota;
-            delete election.canApprovalRate;
-            delete election.approvalRate;
-          } else {
-            delete election.count_STV;
-            delete election.elected_STV;
-            delete election.approvalRate;
             delete election.canApprovalRate;
             delete election.quota;
           }
-        }
 
-        if (election.type == "stv") {
-          election.count_before_redistribution = election.count_STV;
-          election.count_after_redistritbution = election.elected_STV;
-          election.winners = election.elected_STV.filter(can => can.quota > 0);
-          delete election.count_STV;
-          delete election.elected_STV;
-          delete election.count;
-          delete election.approvalRate;
-          delete election.canApprovalRate;
-        }
+          if (election.type == "approval") {
+            if (election.candidates.length == 1) {
+              election.candidate_approval_rate = election.canApprovalRate;
+              election.approval_rate_for_election = election.approvalRate;
+              delete election.count_STV;
+              delete election.elected_STV;
+              delete election.quota;
+              delete election.canApprovalRate;
+              delete election.approvalRate;
+            } else {
+              delete election.count_STV;
+              delete election.elected_STV;
+              delete election.approvalRate;
+              delete election.canApprovalRate;
+              delete election.quota;
+            }
+          }
 
-        let text = JSON.stringify(election,null,2);
+          if (election.type == "stv") {
+            election.count_before_redistribution = election.count_STV;
+            election.count_after_redistritbution = election.elected_STV;
+            election.winners = election.elected_STV.filter(can => can.quota > 0);
+            delete election.count_STV;
+            delete election.elected_STV;
+            delete election.count;
+            delete election.approvalRate;
+            delete election.canApprovalRate;
+          }
 
-        fs.writeFile(`./elections/${election._id}-${election.class.name}.txt`,text,(err)=>{
-          if (err) next(err)
+          let text = JSON.stringify(election,null,2);
 
-          res.download(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
+          fs.writeFile(`./elections/${election._id}-${election.class.name}.txt`,text,(err)=>{
             if (err) next(err)
 
-            fs.unlink(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
-              if (err) console.log(err)
+            res.download(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
+              if (err) next(err)
+
+              fs.unlink(`./elections/${election._id}-${election.class.name}.txt`,(err)=>{
+                if (err) console.log(err)
+              });
+
             });
 
           });
 
-        });
+        } else {
+          return res.status(422).json({errors:[{msg:'This election does not exist.'}]});
+        }
+      })
+    } else {
+      return res.status(422).json({errors:[{msg:'Invalid election ID.'}]});
+    }
 
-      } else {
-        return res.status(422).json({errors:[{msg:'This election does not exist.'}]});
-      }
-    })
-  } else {
-    return res.status(422).json({errors:[{msg:'Invalid election ID.'}]});
+
+
   }
+
 
 
 
