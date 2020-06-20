@@ -23,7 +23,7 @@ const authenticated = (req,res,next) => {
 
 router.get("/example-download",(req,res)=>{
 
-  res.download("/electionex.txt");
+  res.download("./public/electionex.txt");
 
 });
 
