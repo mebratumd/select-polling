@@ -1,0 +1,47 @@
+{
+  "_id": "5ee970223475829aa65d8edb",
+  "total": 14,
+  "links": [
+    "https://www.anotherexample.com"
+  ],
+  "type": "fpp",
+  "candidates": [
+    {
+      "name": "Lucas Orange"
+    },
+    {
+      "name": "Johnny Apple"
+    },
+    {
+      "name": "Samuel Grape"
+    }
+  ],
+  "title": "Class President",
+  "description": "This election is for Class President of the L2's for the upcoming school year. To better inform your vote, please have a look at all of the candidates' platforms and read the expectations of the elected-position (refer to attached link).",
+  "duration": 0.5,
+  "vacancies": 1,
+  "date": "2020-05-26T01:21:38.625Z",
+  "class": {
+    "name": "law2023",
+  },
+  "count": [
+    {
+      "votes": 7,
+      "name": "Lucas Orange"
+    },
+    {
+      "votes": 4,
+      "name": "Johnny Apple"
+    },
+    {
+      "votes": 3,
+      "name": "Samuel Grape"
+    }
+  ],
+  "winners": [
+    {
+      "votes": 7,
+      "name": "Lucas Orange"
+    }
+  ]
+}
