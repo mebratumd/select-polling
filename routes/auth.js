@@ -138,7 +138,6 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   if (!req.session.registered) {
 
-
     let p = new Promise((resolve,reject)=>{
       request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
           let json = JSON.parse(body);
@@ -394,7 +393,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
                         }).then(()=>{
 
-                            return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check you junk mail.`});
+                            return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
 
                         }).catch((err) => {
                           next(err)
@@ -532,12 +531,29 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
+
+    let p = new Promise((resolve,reject)=>{
+
+      request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+          let json = JSON.parse(body);
+          if (json.success) {
+            if (json.score <= 0.3) {
+              reject();
+            } else {
+              resolve();
+            }
+          } else {
+            reject();
+          }
+      });
+
+    });
 
     p.then(()=>{
 
@@ -558,13 +574,13 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           });
         } else {
 
-          if (req.session.attempts) {
-            req.session.attempts--;
-            if (req.session.attempts == 0) {
-              req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+          if (req.session[req.user.username]) {
+            req.session[req.user.username]--;
+            if (req.session[req.user.username] == 0) {
+              req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
             }
           } else {
-            req.session.attempts = 9;
+            req.session[req.user.username] = 9;
           }
 
           return res.status(401).json({errors:[{msg:'Incorrect password.'}]});
@@ -579,22 +595,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     return res.status(422).json({errors:[{msg:'Account locked. Please wait 2 mintutes.'}]});
   }
 
-  let p = new Promise((resolve,reject)=>{
 
-    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
-        let json = JSON.parse(body);
-        if (json.success) {
-          if (json.score <= 0.3) {
-            reject();
-          } else {
-            resolve();
-          }
-        } else {
-          reject();
-        }
-    });
-
-  });
 
 
 
@@ -612,11 +613,11 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     bcrypt.compare(req.body.password, req.user.password, (err,resp)=>{
@@ -664,13 +665,13 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
 
       } else {
 
-        if (req.session.attempts) {
-          req.session.attempts--;
-          if (req.session.attempts == 0) {
-            req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+        if (req.session[req.user.username]) {
+          req.session[req.user.username]--;
+          if (req.session[req.user.username] == 0) {
+            req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
           }
         } else {
-          req.session.attempts = 9;
+          req.session[req.user.username] = 9;
         }
 
         return res.status(401).json({errors:[{msg:'Incorrect password.'}]});

@@ -110,11 +110,11 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     Classroom.findOne({name:req.body.name}).populate("elections").exec((err,room)=>{
@@ -173,13 +173,13 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
 
           } else {
             // incorrect password
-            if (req.session.attempts) {
-              req.session.attempts--;
-              if (req.session.attempts == 0) {
-                req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+            if (req.session[req.user.username]) {
+              req.session[req.user.username]--;
+              if (req.session[req.user.username] == 0) {
+                req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
               }
             } else {
-              req.session.attempts = 9;
+              req.session[req.user.username] = 9;
             }
 
             return res.status(422).json({errors:[{msg:`Incorrect password for ${room.name}.`}]});
@@ -996,11 +996,11 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     if (req.params.key === "code") {
@@ -1019,13 +1019,13 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
 
                 if (!pass) {
 
-                  if (req.session.attempts) {
-                    req.session.attempts--;
-                    if (req.session.attempts == 0) {
-                      req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+                  if (req.session[req.user.username]) {
+                    req.session[req.user.username]--;
+                    if (req.session[req.user.username] == 0) {
+                      req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
                     }
                   } else {
-                    req.session.attempts = 9;
+                    req.session[req.user.username] = 9;
                   }
 
                   throw new Error('Incorrect access code.');
@@ -1100,13 +1100,13 @@ check('password').isLength({min:6}).withMessage("Minimum of 6 characters.").matc
           });
         } else {
 
-          if (req.session.attempts) {
-            req.session.attempts--;
-            if (req.session.attempts == 0) {
-              req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+          if (req.session[req.user.username]) {
+            req.session[req.user.username]--;
+            if (req.session[req.user.username] == 0) {
+              req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
             }
           } else {
-            req.session.attempts = 9;
+            req.session[req.user.username] = 9;
           }
 
           return res.status(422).json({errors:[{msg:'Incorrect key.'}]});
@@ -1597,11 +1597,11 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     Classroom.findOne({name:req.body.name}).populate({
@@ -1632,13 +1632,13 @@ router.post("/delete-poll",authenticated,(req,res,next) => {
                     }).catch((err)=>next(err));
                   } else {
 
-                    if (req.session.attempts) {
-                      req.session.attempts--;
-                      if (req.session.attempts == 0) {
-                        req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+                    if (req.session[req.user.username]) {
+                      req.session[req.user.username]--;
+                      if (req.session[req.user.username] == 0) {
+                        req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
                       }
                     } else {
-                      req.session.attempts = 9;
+                      req.session[req.user.username] = 9;
                     }
 
                     return res.status(422).json({ errors: [{msg:"Incorrect password."}] });
@@ -1690,11 +1690,11 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     Classroom.findOne({ name:req.body.name },(err,room)=>{
@@ -1747,13 +1747,13 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
               }
             } else {
 
-              if (req.session.attempts) {
-                req.session.attempts--;
-                if (req.session.attempts == 0) {
-                  req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+              if (req.session[req.user.username]) {
+                req.session[req.user.username]--;
+                if (req.session[req.user.username] == 0) {
+                  req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
                 }
               } else {
-                req.session.attempts = 9;
+                req.session[req.user.username] = 9;
               }
 
               return res.status(401).json({errors:[{msg:"Password is incorrect."}]});
@@ -1788,11 +1788,11 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
 
   let currentTime = new Date().getTime();
 
-  if (req.session.attempts == undefined || req.session.attempts > 0 || req.session.timeout < currentTime) {
+  if (req.session[req.user.username] == undefined || req.session[req.user.username] > 0 || req.session[`${req.user.username}_timeOut`] < currentTime) {
 
-    if (req.session.timeout) {
-      delete req.session.attempts;
-      delete req.session.timeout;
+    if (req.session[`${req.user.username}_timeOut`]) {
+      delete req.session[req.user.username];
+      delete req.session[`${req.user.username}_timeOut`];
     }
 
     // password, name
@@ -1818,13 +1818,13 @@ check('password').isLength({min:6,max:12}).withMessage("Password must be between
         })
       } else {
 
-        if (req.session.attempts) {
-          req.session.attempts--;
-          if (req.session.attempts == 0) {
-            req.session.timeout = new Date().getTime() + 120000; // 2 min lock out
+        if (req.session[req.user.username]) {
+          req.session[req.user.username]--;
+          if (req.session[req.user.username] == 0) {
+            req.session[`${req.user.username}_timeOut`] = new Date().getTime() + 120000; // 2 min lock out
           }
         } else {
-          req.session.attempts = 9;
+          req.session[req.user.username] = 9;
         }
 
         return res.status(422).json({errors:[{msg:'Incorrect password.'}]});
