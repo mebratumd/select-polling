@@ -21,6 +21,12 @@ const authenticated = (req,res,next) => {
 
 }
 
+router.get("/example-download",(req,res)=>{
+
+  res.download("/electionex.txt");
+
+});
+
 router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Username must only contain letters (french or english) and/or numbers."),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")],(req, res, next) => {

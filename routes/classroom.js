@@ -1918,11 +1918,10 @@ router.get("/permission/:id",authenticated,(req,res,next)=>{
 
 });
 
+
 router.get("/download/:id",authenticated,(req,res,next)=>{
 
-  if (req.params.id == 1) {
-    res.download("/electionex.txt");
-  } else {
+
 
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
       Election.findById(req.params.id).populate({
@@ -2000,9 +1999,6 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
       return res.status(422).json({errors:[{msg:'Invalid election ID.'}]});
     }
 
-
-
-  }
 
 
 
