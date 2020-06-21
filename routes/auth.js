@@ -125,14 +125,15 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           <h1 style="text-align:center;"><img height="20" width="20" src="https://www.selectpolling.ca/favicon.ico"> Select Polling</h1>
           <h2>Hi, ${name}</h2>
           <p>Thank you for signing up with <a href="https://www.selectpolling.ca/">Select Polling</a>. To complete the activation of your account click the URL below or copy and paste it into your browser to complete activation.
-          If for any reason you are having troubles activating your account please contact us at <b>contact@selectpolling.ca.</b></p><br>
+          If for any reason you are having troubles activating your account, please contact us at <b>contact@selectpolling.ca.</b></p><br>
           <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>${activationLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not sign up with Select Polling, please disregard this message.</small>
-          <div style="text-align:center;margin-top:100px;">
+          <div style="text-align:center;margin-top:100px;padding:10px;background-color:#f2f2f2">
             <small>
               2020 &copy; Select Polling. All Rights Reserved.<br>
-              Questions? contact@selectpolling.ca<br>
+              <img src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
+              WPG, MB, CAN <img src="https://www.selectpolling.ca/assets/heart.png"><br>
               <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
             </small>
           </div>
@@ -723,14 +724,15 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
           <h1 style="text-align:center;"><img height="20" width="20" src="https://www.selectpolling.ca/favicon.ico"> Select Polling</h1>
           <h2>Hi, ${name}</h2>
           <p>To complete the password reset of your account click the URL below or copy and paste it into your browser.
-          If for any reason you are having troubles please contact us at <b>contact@selectpolling.ca</b>.</p><br>
+          If for any reason you are having troubles, please contact us at <b>contact@selectpolling.ca</b>.</p><br>
           <span style="margin-top:10px;padding:10px;"><a href=${resetLink}>${resetLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not ask for a password reset, please disregard this message.</small>
-          <div style="text-align:center;margin-top:100px;">
+          <div style="text-align:center;margin-top:100px;padding:10px;background-color:#f2f2f2">
             <small>
               2020 &copy; Select Polling. All Rights Reserved.<br>
-              Questions? contact@selectpolling.ca<br>
+              <img src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
+              WPG, MB, CAN <img src="https://www.selectpolling.ca/assets/heart.png"><br>
               <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
             </small>
           </div>
