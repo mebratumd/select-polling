@@ -129,11 +129,11 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
           <span style="margin-top:10px;padding:10px;"><a href=${activationLink}>${activationLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not sign up with Select Polling, please disregard this message.</small>
-          <div style="text-align:center;margin-top:100px;padding:10px;background-color:#f2f2f2">
+          <div style="text-align:center;margin-top:100px;">
             <small>
               2020 &copy; Select Polling. All Rights Reserved.<br>
-              <img src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
-              WPG, MB, CAN <img src="https://www.selectpolling.ca/assets/heart.png"><br>
+              <img height="12" width="12" src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
+              WPG, MB, CAN <img height="12" width="12" src="https://www.selectpolling.ca/assets/heart.png"><br>
               <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
             </small>
           </div>
@@ -728,11 +728,11 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
           <span style="margin-top:10px;padding:10px;"><a href=${resetLink}>${resetLink}</a></span>
           <br><br>
           <small style="display:block;margin-top:20px;">If you did not ask for a password reset, please disregard this message.</small>
-          <div style="text-align:center;margin-top:100px;padding:10px;background-color:#f2f2f2">
+          <div style="text-align:center;margin-top:100px;">
             <small>
               2020 &copy; Select Polling. All Rights Reserved.<br>
-              <img src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
-              WPG, MB, CAN <img src="https://www.selectpolling.ca/assets/heart.png"><br>
+              <img height="12" width="12" src="https://www.selectpolling.ca/assets/help.png"> contact@selectpolling.ca<br>
+              WPG, MB, CAN <img height="12" width="12" src="https://www.selectpolling.ca/assets/heart.png"><br>
               <a href="https://www.selectpolling.ca/privacy" style="color:black">Privacy Policy</a> | <a href="https://www.selectpolling.ca/terms" style="color:black;">Terms and Conditions</a>
             </small>
           </div>
