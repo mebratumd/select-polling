@@ -374,11 +374,9 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
                           return new Promise((resolve,reject)=>{
                             Registration.find({}).exec((err,info)=>{
-                              console.log(info);
                               if (err) reject(err);
                               if (info.length > 0) {
                                 info[0].counter = info[0].counter + 1;
-                                console.log(info[0].counter);
                                 if (info[0].counter == 1) {
                                   info[0].time = new Date().getTime();
                                 }
@@ -738,65 +736,126 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
     });
   }
 
+  let p = new Promise((resolve,reject)=>{
+    request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
 
-  request.post('https://www.google.com/recaptcha/api/siteverify',{form:{secret:'6Ld-1PsUAAAAALONqcsUeJCQIybmEDUi5XkaeYFK',response:req.body.token}},(err,response,body)=>{
+      if (JSON.parse(body).score > 0.3) {
+        resolve();
+      } else {
+        reject('Something wrong.');
 
-    if (JSON.parse(body).score > 0.3) {
-      Student.findOne({email:req.body.email}).exec((err,student)=>{
-        if (err) next(err)
-        if (student){
+      }
 
-          if (student.active) {
+    });
+  });
 
-            const time = new Date().getTime();
+  p.then(()=>{
+    return new Promise((resolve,reject)=>{
+      Registration.find({}).exec((err,info)=>{
+        if (err) reject(err);
+        if (info.length > 0) {
+          let currentTime = new Date().getTime();
+          let delta = currentTime - info[0].time;
+          if (info[0].counter >= 400 && delta < 3600000) {
+            reject('Cannot fulfill password reset, please try again later.');
+          }
 
-            if (student.forgotPassword) {
-
-              if (time - student.forgotPasswordTimer > 600000) {
-                student.forgotPassword = uuidv4();
-                student.forgotPasswordTimer = new Date().getTime();
-                student.save().then((student_) => {
-
-                  resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
-                    return res.json({});
-                  }).catch((err)=>next(err));
+          if (delta >= 3600000) {
+            info[0].counter = 0;
+            info[0].save().then(()=>{
+              resolve();
+            })
+          } else {
+            resolve();
+          }
 
 
-                }).catch((err)=>next(err))
-              } else {
-                // 10 minutes has not passed
-                return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
-              }
 
-            } else {
+        } else {
+          resolve();
+        }
+      })
+    });
+  }).then(()=>{
+
+    Student.findOne({email:req.body.email}).exec((err,student)=>{
+      if (err) next(err)
+      if (student){
+
+        if (student.active) {
+
+          const time = new Date().getTime();
+
+          if (student.forgotPassword) {
+
+            if (time - student.forgotPasswordTimer > 600000) {
               student.forgotPassword = uuidv4();
               student.forgotPasswordTimer = new Date().getTime();
               student.save().then((student_) => {
 
                 resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+                  return new Promise((resolve,reject)=>{
+                    Registration.find({}).exec((err,info)=>{
+                      if (err) reject(err);
+                      if (info.length > 0) {
+                        info[0].counter = info[0].counter + 1;
+                        if (info[0].counter == 1) {
+                          info[0].time = new Date().getTime();
+                        }
+                        info[0].save().then(()=>{
+                          resolve();
+                        });
+                      } else {
+                        const newEntry = new Registration({
+                          time: new Date().getTime(),
+                          counter: 1
+                        });
+                        newEntry.save().then(()=>{
+                          resolve();
+                        })
+                      }
+                    });
+                  });
+                }).then(()=>{
                   return res.json({});
                 }).catch((err)=>next(err));
 
 
               }).catch((err)=>next(err))
+
+            } else {
+              // 10 minutes has not passed
+              return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
             }
-
-          } else {
-
-            return res.status(422).json({errors:[{msg:'You must activate your account first before reseting your password.'}]});
-
 
           }
 
         } else {
-          return res.status(404).json({ errors: [{msg:'This email is not registered with a user.'}]});
-        }
-      })
-    } else {
-      return res.status(500).json({errors:[{msg:"Something wrong."}]});
-    }
 
+          return res.status(422).json({errors:[{msg:'You must activate your account first before reseting your password.'}]});
+
+
+        }
+
+      } else {
+        return res.status(404).json({ errors: [{msg:'This email is not registered with a user.'}]});
+      }
+    })
+
+
+  }).catch((err)=>{
+    if (err == 'Something wrong.') {
+      return res.status(500).json({errors:[{msg:"Something wrong."}]});
+    } else if (err == 'Cannot fulfill password reset, please come try again later.') {
+      return res.status(503).json({errors:[{msg:'Cannot fulfill password reset, please come try again later.'}]});
+    } else {
+      next(err);
+    }
   });
+
+
+
+
 
 });
 
