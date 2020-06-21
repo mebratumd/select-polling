@@ -786,7 +786,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
 
           const time = new Date().getTime();
 
-          if (!student.forgotPassword) {
+          if (student.forgotPassword) {
 
             if (time - student.forgotPasswordTimer > 600000) {
               student.forgotPassword = uuidv4();
@@ -827,6 +827,43 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
               // 10 minutes has not passed
               return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
             }
+
+          } else {
+
+            student.forgotPassword = uuidv4();
+            student.forgotPasswordTimer = new Date().getTime();
+            student.save().then((student_) => {
+
+              resetEmail(req.body.email,`https://www.selectpolling.ca/change-pwd/${student_.username}/${student_.forgotPassword}`,student_.firstname).then(()=>{
+                return new Promise((resolve,reject)=>{
+                  Registration.find({}).exec((err,info)=>{
+                    if (err) reject(err);
+                    if (info.length > 0) {
+                      info[0].counter = info[0].counter + 1;
+                      if (info[0].counter == 1) {
+                        info[0].time = new Date().getTime();
+                      }
+                      info[0].save().then(()=>{
+                        resolve();
+                      });
+                    } else {
+                      const newEntry = new Registration({
+                        time: new Date().getTime(),
+                        counter: 1
+                      });
+                      newEntry.save().then(()=>{
+                        resolve();
+                      })
+                    }
+                  });
+                });
+              }).then(()=>{
+                return res.json({});
+              }).catch((err)=>next(err));
+
+
+            }).catch((err)=>next(err))
+
 
           }
 
