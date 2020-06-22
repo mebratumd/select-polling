@@ -1964,12 +1964,12 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
             }
 
             election.count.map((ob) => {
-              let disVotes = election.total - ob.votes;
+              let disVotes = election.total_votes - ob.votes;
               return {"approval_votes":ob.votes,"disapproval_votes":disVotes,"name":ob.name}
             });
 
             election.winners.map((ob)=>{
-              let disVotes = election.total - ob.votes;
+              let disVotes = election.total_votes - ob.votes;
               return {"approval_votes":ob.votes,"disapproval_votes":disVotes,"name":ob.name}
             });
 
