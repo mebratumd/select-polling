@@ -17,11 +17,12 @@ module.exports = (passport) => {
                 let currentTime = new Date().getTime();
                 if (res) {
                   if (user.loginAttempts < 10 || user.loginTimeout < currentTime) {
-                    if (user.loginTimeout < currentTime) {
-                      user.loginAttempts = 0;
-                      user.loginTimeout = undefined;
-                      await user.save();
-                    }
+                    /*if (user.loginTimeout < currentTime) {
+
+                    }*/
+                    user.loginAttempts = 0;
+                    user.loginTimeout = undefined;
+                    await user.save();
 
                     return done(null, user);
                   } else {
