@@ -604,7 +604,7 @@ check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).
               });
 
               if (!pass) {
-                throw new Error(`Invalid email. Please ensure all emails are from the ${req.body.school}.`);
+                throw new Error(`Invalid email. Please ensure all emails are from the ${room.school}.`);
               }
 
 
@@ -613,7 +613,7 @@ check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).
               const re = new RegExp(`^[\\w.]{4,25}@${extForGivenSchool}$`);
               if (!re.test(req.body.email)) {
                 //error
-                throw new Error(`Invalid email. Please ensure all emails are from the ${req.body.school}.`);
+                throw new Error(`Invalid email. Please ensure all emails are from the ${room.school}.`);
               }
             }
 
