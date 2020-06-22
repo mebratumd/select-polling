@@ -277,7 +277,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
   const studentCheck = (student) => {
     const headers = Object.keys(student).map(val => val.trim().replace(/\s/g,'').toLowerCase());
-    const studentVals = Object.values(student).map(val => val.trim().replace(/\s/g,' '));
+    const studentVals = Object.values(student).map(val => val.trim().replace(/\s/g,' ').toLowerCase());
     const sorted = {};
     const clean = {};
 
