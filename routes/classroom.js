@@ -150,6 +150,7 @@ check('name').isLength({min:6,max:12}).withMessage("Class name must be between 6
                 if (s) {
 
                   if (s.classrooms_student.length < 5) {
+
                     s.classrooms_student.push(room.id);
                     room.joined = room.joined + 1;
                     room.save().catch(err => next(err));
