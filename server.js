@@ -1,3 +1,4 @@
+require("newrelic");
 const express = require('express');
 const passport = require('passport');
 const auth = require("./routes/auth.js");
