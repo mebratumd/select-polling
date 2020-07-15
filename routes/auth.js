@@ -22,9 +22,7 @@ const authenticated = (req,res,next) => {
 }
 
 router.get("/example-download",(req,res)=>{
-
   res.download("./public/browser/electionex.txt");
-
 });
 
 router.post('/login',[check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Username must only contain letters (french or english) and/or numbers."),
@@ -73,8 +71,8 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 });
 
 
-
-router.post("/register", [check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail(),
+// .matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ._]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english or french), numbers, underscores or periods.').
+router.post("/register", [check('email').isLength({min:6,max:100}).withMessage('E-mail must be between 6-100 characters.').isEmail().withMessage("Invalid e-mail.").normalizeEmail(),
 check('status').isIn(['yes','no']).withMessage('Please submit a valid status.'),
 check('username').isLength({min:4,max:12}).withMessage("Username must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Username must only contain letters (french or english) and/or numbers.").customSanitizer((val) => {
   if (val) {
@@ -91,7 +89,7 @@ check("lastname").isLength({min:2,max:16}).withMessage("Last name must be betwee
     return val.toLowerCase();
   }
 }),
-check("school").isIn(['University of Manitoba']).withMessage("School not found."),
+check("school").isIn(["Athabasca University","Concordia University (Edmonton)","King's University","MacEwan University","Mount Royal University","University of Alberta","University of Calgary","University of Lethbridge","Kwantlen Polytechnic University","Royal Roads University","Simon Fraser University","Thompson Rivers University","Trinity Western University","University of British Columbia","University of Northern British Columbia","University of Fraser Valley","University of Victoria","Vancouver Island University","Brandon University","Canadian Mennonite University","Université de Saint-Boniface","University of Manitoba","University of Winnipeg","Mount Allison University","St. Thomas University","Université de Moncton","University of New Brunswick","Acadia University","Cape Breton University","Dalhousie University","Mount Saint Vincent University","NSCAD University","Saint Mary's University","St. Francis Xavier University","Université Sainte-Anne","University of King's College","Memorial University of Newfoundland","Algoma University","Brescia University College","Brock University","Carleton University","Huron University College","King's University College at Western University","Lakehead University","Laurentian University","McMaster University","Nipissing University","OCAD University","Ontario Tech University","Queen's University","Redeemer University","Royal Military College of Canada","Ryerson University","St. Jerome's University","Trent University","University of Guelph","University of Ottawa","University of St. Michael's College","University of Sudbury","University of Toronto","University of Waterloo","University of Windsor","Victoria University", "Western University","Wilfrid Laurier University","York University","University of Prince Edward Island","Bishop's University","Concordia University (Québec)","École de technologie supérieure","École nationale d'administration publique","HEC Montréal","Institut national de la recherche scientifique","McGill University","Polytechnique Montréal","Université de Montréal","Université de Sherbrooke","Université du Québec","Université du Québec à Chicoutimi","Université du Québec à Montréal","Université du Québec à Rimouski","Université du Québec à Trois-Rivières","Université du Québec en Abitibi-Témiscamingue","Université du Québec en Outaouais","Université Laval","Université TÉLUQ","First Nations University of Canada","University of Regina","University of Saskatchewan"]).withMessage("School not found."),
 check('password').isLength({min:4,max:12}).withMessage("Password must be between 4-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('confirmPassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match."),
 check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-]+$/).withMessage("Something wrong.")
@@ -160,7 +158,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
     });
 
     // school extensions added here
-    const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
+    //const schoolExtensions = {'University of Manitoba': ['@myumanitoba.ca']};
 
     p.then(()=>{
 
@@ -192,6 +190,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
       });
 
     }).then(()=>{
+      /*
       if (typeof schoolExtensions[req.body.school] == "object") {
         validEmail = schoolExtensions[req.body.school].some((extension)=>{
           const re = new RegExp(`${extension}$`);
@@ -204,7 +203,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
       if (!validEmail) {
         return res.status(422).json({errors:[{msg:`Invalid email extension for the ${req.body.school}`}]});
-      }
+      }*/
 
       if (req.body.status == "yes") {
         if (req.body.electionKey) {
@@ -309,7 +308,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
 
                             }).then(()=>{
-                              return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
+                              return res.json({msg:`Thank you for signing up, ${student.firstname}. Check your e-mail to complete activation.`});
                             }).catch((err) => {
                               next(err)
                             });
@@ -325,7 +324,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                     });
 
                   } else {
-                    return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+                    return res.status(422).json({errors:[{msg:"This e-mail is already in use."}]});
                   }
                 });
 
@@ -397,7 +396,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
 
                         }).then(()=>{
 
-                            return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your email to complete activation. If the activation email is not present in your inbox, please check your junk mail.`});
+                            return res.json({msg:`Thank you for signing up, ${master.firstname}. Check your e-mail to complete activation.`});
 
                         }).catch((err) => {
                           next(err)
@@ -413,7 +412,7 @@ check('token').isLength({max:600}).withMessage('Something wrong').matches(/^[\w-
                 });
 
               } else {
-                return res.status(422).json({errors:[{msg:"This email is already in use."}]});
+                return res.status(422).json({errors:[{msg:"This e-mail is already in use."}]});
               }
             });
           }
@@ -478,7 +477,7 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
-    select: 'name students elections joined partake',
+    select: 'name students elections joined school partake',
     populate: {
       path: 'elections',
       model: 'Election',
@@ -692,7 +691,8 @@ router.post("/delete-account",authenticated,[check('password').isLength({min:4,m
 
 });
 
-router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid email.").matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail()],(req,res,next)=>{
+// .matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ._]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english or french), numbers, underscores or periods.').
+router.post("/forgot-password",[check('email').isLength({min:6,max:100}).withMessage('E-mail must be between 6-100 characters.').isEmail().withMessage("Invalid e-mail.").normalizeEmail()],(req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -825,7 +825,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
 
             } else {
               // 10 minutes has not passed
-              return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another email to reset your password.'}]});
+              return res.status(401).json({ errors: [{msg:'Please wait 10 minutes before requesting another e-mail to reset your password.'}]});
             }
 
           } else {
@@ -875,7 +875,7 @@ router.post("/forgot-password",[check('email').isEmail().withMessage("Invalid em
         }
 
       } else {
-        return res.status(404).json({ errors: [{msg:'This email is not registered with a user.'}]});
+        return res.status(404).json({ errors: [{msg:'This e-mail is not registered with a user.'}]});
       }
     })
 

@@ -262,7 +262,15 @@ router.post("/submit",authenticated,[check('classname').isLength({min:6,max:12})
     return val.toLowerCase();
   }
 }),
-check('school').isIn(['University of Manitoba']).withMessage("School not found."),
+check('emails.*').isLength({min:6,max:100}).withMessage('E-mail\'s must be between 6-100 characters.').isEmail().withMessage("Invalid e-mail found.").normalizeEmail(),
+check('students').custom((allStudents,{req}) => {
+  const emails = allStudents.map(s => s.email);
+  if (_.isEqual(req.body.emails,emails)) {
+    return true;
+  } else {
+    return false;
+  }
+}).withMessage('Invalid submission.'),
 check('partake').isIn([true,false]).withMessage("Partake status must be either 'yes' or 'no'"),
 check('password').isLength({min:6,max:12}).withMessage("Password must be between 6-12 characters.").matches(/^[0-9a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ]+$/).withMessage("Password must only contain letters (french or english) and/or numbers."),
 check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessage("Passwords do not match.")], (req,res,next)=>{
@@ -272,13 +280,13 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
     return res.status(422).json({ errors: errors.array() });
   }
 
-  let schoolExtensions = {'University of Manitoba': ['myumanitoba.ca']};
+  // let schoolExtensions = {'University of Manitoba': ['myumanitoba.ca']};
 
   let finalClassList = [];
 
   const studentCheck = (student) => {
     const headers = Object.keys(student).map(val => val.trim().replace(/\s/g,'').toLowerCase());
-    const studentVals = Object.values(student).map(val => val.trim().replace(/\s/g,' ').toLowerCase());
+    const studentVals = Object.values(student).map(val => val.trim().replace(/\s/g,' '));
     const sorted = {};
     const clean = {};
 
@@ -304,6 +312,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
     if (Object.values(student).length == 2) {
       Object.values(sorted).forEach((field,i)=>{
         //email
+        /*
         if (i == 0) {
           if (typeof schoolExtensions[req.body.school] == 'object') {
             pass = schoolExtensions[req.body.school].some((ex)=>{
@@ -330,6 +339,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
 
         }
       }
+        */
         // name
         if (i==1) {
           const re = new RegExp("^[a-zA-ZàâäèéêëîïôœùûüÿçÀÂÄÈÉÊËÎÏÔŒÙÛÜŸÇ\\-\\.' ]{5,33}$");
@@ -347,7 +357,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
     }
 
     if (student.email.toLowerCase() == req.user.email) {
-      throw new Error(`Inputted student with the same email as you. Ensure each student has a unique email address.
+      throw new Error(`Inputted student with the same e-mail as you. Ensure each student has a unique e-mail address.
       If you are a student and are planning to partake in elections leave your information out of the student list; it will be added on our end.`);
     }
 
@@ -368,12 +378,12 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
           try {
             req.body.students.forEach(studentCheck);
 
-            const studentemails = finalClassList.map((student)=>{ return student.email });
+            const studentemails = finalClassList.map((student)=>{ return student.email.toLowerCase() });
             const duplicateStudentEmail = studentemails.some((studentemail,idx)=>{
               return studentemails.indexOf(studentemail) != idx;
             });
             if (duplicateStudentEmail) {
-              throw new Error('Duplicate student emails found. Each student should have a unique email address.');
+              throw new Error('Duplicate student e-mail found. Each student should have a unique email address.');
             }
 
             const studentnames = finalClassList.map((student)=>{ return student.name.toLowerCase() });
@@ -421,7 +431,7 @@ check('cpassword').custom((cpwd,{req}) => cpwd === req.body.password).withMessag
                   const addClassroom = new Classroom({
                     name: req.body.classname.toLowerCase(),
                     password: hash,
-                    school: req.body.school,
+                    school: req.user.school,
                     partake: req.body.partake,
                     registered: new Date(),
                     master: req.user.id,
@@ -473,7 +483,7 @@ router.post("/delete-student",authenticated,[check('classname').isLength({min:6,
     return val.toLowerCase();
   }
 }),
-check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,res,next)=>{
+check('email').isEmail().withMessage('Invalid e-mail.').normalizeEmail()], (req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -502,7 +512,7 @@ check('email').isEmail().withMessage('Invalid email.').normalizeEmail()], (req,r
               // this should execute regardless of student status
               Student.findOne({email:req.body.email}).exec((err,student)=>{
                 if (err) next(err)
-                if (student) {
+                if (student.classrooms_student.indexOf(room.id) > -1) {
                   const dec = room.joined - 1;
                   room.joined = dec;
                   const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
@@ -560,7 +570,7 @@ check('name').isLength({min:5,max:33}).withMessage('Name must be between 5-33 ch
     return val.trim().replace(/\s/g,' ')
   }
 }),
-check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).withMessage('Email must be between 4-25 characters in length before the @ symbol. Characters can include letters (english), numbers, underscores or periods.').normalizeEmail()], (req,res,next)=>{
+check('email').isLength({min:6,max:100}).withMessage('E-mail must be between 6-100 characters.').isEmail().withMessage('Invalid e-mail.').normalizeEmail()], (req,res,next)=>{
 
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -583,7 +593,7 @@ check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).
             //looking for duplicate email and student number
             room.students.forEach((student)=>{
               if (student.email == req.body.email) {
-                throw new Error('Duplicate email found.');
+                throw new Error('Duplicate e-mail found.');
               }
               if (student.name.toLowerCase() == req.body.name.toLowerCase()) {
                 throw new Error('This name already exists in the class list.');
@@ -591,6 +601,7 @@ check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).
             });
 
             // Valid email
+            /*
             const schoolExtensions = {'University of Manitoba': ['myumanitoba.ca']};
             const extForGivenSchool = schoolExtensions[room.school];
 
@@ -617,7 +628,7 @@ check('email').isEmail().withMessage('Invalid email.').matches(/^[\w.]{4,25}@/).
                 throw new Error(`Invalid email. Please ensure all emails are from the ${room.school}.`);
               }
             }
-
+            */
             //
             room.students.push({email:req.body.email,name:req.body.name});
             room.save().then(()=>{
