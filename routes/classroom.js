@@ -512,25 +512,38 @@ check('email').isEmail().withMessage('Invalid e-mail.').normalizeEmail()], (req,
               // this should execute regardless of student status
               Student.findOne({email:req.body.email}).exec((err,student)=>{
                 if (err) next(err)
-                if (student.classrooms_student.indexOf(room.id) > -1) {
-                  const dec = room.joined - 1;
-                  room.joined = dec;
-                  const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
-                  student.classrooms_student = newClassList;
-                  student.save().then(()=>{
+                if (student) {
+
+                  if (student.classrooms_student.indexOf(room.id) > -1) {
+                    const dec = room.joined - 1;
+                    room.joined = dec;
+                    const newClassList = student.classrooms_student.filter(classroom => classroom != room.id);
+                    student.classrooms_student = newClassList;
+                    student.save().then(()=>{
+                      const newClassList = room.students.filter(student => student.email != req.body.email);
+                      room.students = newClassList;
+                      room.save().then(()=>{
+                        return res.json({removedStudent:req.body,joined:true});
+                      }).catch((err)=>next(err));
+                    }).catch((err)=>next(err));
+                  } else {
                     const newClassList = room.students.filter(student => student.email != req.body.email);
                     room.students = newClassList;
                     room.save().then(()=>{
-                      return res.json({removedStudent:req.body,joined:true});
+                      return res.json({removedStudent:req.body,joined:false});
                     }).catch((err)=>next(err));
-                  }).catch((err)=>next(err));
+                  }
+
                 } else {
+
                   const newClassList = room.students.filter(student => student.email != req.body.email);
                   room.students = newClassList;
                   room.save().then(()=>{
                     return res.json({removedStudent:req.body,joined:false});
                   }).catch((err)=>next(err));
+
                 }
+
               });
 
 
