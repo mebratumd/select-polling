@@ -477,11 +477,10 @@ router.get("/loggedin",authenticated,(req,res,next)=>{
 
   Student.findById(req.user.id).populate({
     path: 'classrooms_master classrooms_student',
-    select: 'name students elections joined school partake',
+    select: 'name students elections joined school partake master',
     populate: {
-      path: 'elections',
-      model: 'Election',
-      select: 'type date duration title status electionAccess',
+      path: 'elections master',
+      select: 'type date duration title status electionAccess firstname lastname email',
       options: {sort:{'date':'desc'}}
     }
   }).select('-password -__v -active -key -hash -forgotPassword -forgotPasswordTimer').lean().exec((err,student)=>{
