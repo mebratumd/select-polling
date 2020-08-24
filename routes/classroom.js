@@ -1989,14 +1989,14 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
             }
 
             election.count.map((ob) => {
-              let disVotes = election.total_votes - ob.votes;
+              let disVotes = election.total_votes/election.candidates.length - ob.votes;
               ob['approval_votes'] = ob.votes;
               ob['disapproval_votes'] = disVotes;
               delete ob.votes;
             });
 
             election.winners.map((ob)=>{
-              let disVotes = election.total_votes - ob.votes;
+              let disVotes = election.total_votes/election.candidates.length - ob.votes;
               ob['approval_votes'] = ob.votes;
               ob['disapproval_votes'] = disVotes;
               delete ob.votes;
