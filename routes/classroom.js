@@ -2005,9 +2005,21 @@ router.get("/download/:id",authenticated,(req,res,next)=>{
           }
 
           if (election.type == "stv") {
-            election.count_before_redistribution = election.count_STV;
-            election.count_after_redistritbution = election.elected_STV;
-            election.winners = election.elected_STV.filter(can => can.quota > 0);
+            election.count_before_redistribution = election.count_STV.map((v)=>{
+              v.votes = v.total;
+              delete v.total;
+              return v;
+            });
+            election.count_after_redistritbution = election.elected_STV.map((v)=>{
+              v.votes = v.quota;
+              delete v.quota;
+              return v;
+            });
+            election.winners = election.elected_STV.filter(can => can.quota > 0).map((v)=>{
+              v.votes = v.quota;
+              delete v.quota;
+              return v;
+            });
             delete election.count_STV;
             delete election.elected_STV;
             delete election.count;
