@@ -1,4 +1,3 @@
-require("newrelic");
 const express = require('express');
 const passport = require('passport');
 const auth = require("./routes/auth.js");
@@ -14,7 +13,7 @@ const Student = require("./models/student.js");
 const Classroom = require("./models/classroom.js");
 const sslRedirect = require('heroku-ssl-redirect');
 
-//require('dotenv').config();
+require('dotenv').config();
 
 const app = express();
 const server = require('http').Server(app);
